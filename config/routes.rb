@@ -1,4 +1,9 @@
 Rails.application.routes.draw do
+  get "movies", to: "movies#index"
+  get "admin/movies", to: "admin/movies#index"
+  get "admin/movies/new", to: "admin/movies#new"
+
+  
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
