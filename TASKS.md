@@ -320,3 +320,164 @@ end
 - 同じタイトルの重複登録が防がれる
 - エラー時に適切な flash メッセージが表示される
 - バリデーションエラーが表示される
+
+---
+
+# lesson-4
+
+## 課題概要
+
+映画の編集機能を実装する。映画タイトルのタイピングミスなどを修正できるように、管理画面から既存の映画情報を編集・更新できる機能を追加する。
+
+### 要件
+
+- GET /admin/movies/:id で指定した ID の映画の編集画面を表示する
+- GET /admin/movies の ID をリンクテキストにして、そのレコードに対応する編集画面に移動できるようにする
+- ページを開いたとき、登録済み情報がフォームに入っている状態にする
+- フォームの仕様や項目名などは登録画面と同様にする
+- フォームの送信先は PUT /admin/movies/:id
+- PUT /admin/movies/:id で指定した ID の映画レコードを更新する
+- エラー処理など登録時のフォーム送信と同様にする
+- 同じ映画タイトルの重複チェックは編集時も行う（ただし自分自身は除外）
+
+## 実装手順
+
+### 1. ルーティングの設定
+
+- [ ] `config/routes.rb` を編集
+- [ ] admin 名前空間の movies に edit, update アクションを追加
+- [ ] `namespace :admin do resources :movies, only: [:index, :new, :create, :edit, :update] end`
+
+### 2. Admin::MoviesController の拡張
+
+- [ ] `app/controllers/admin/movies_controller.rb` を編集
+- [ ] edit アクションを追加
+  - [ ] `Movie.find(params[:id])` で対象の映画を取得
+  - [ ] @movie インスタンス変数に代入
+  - [ ] レコードが見つからない場合の例外処理
+- [ ] update アクションを追加
+  - [ ] `Movie.find(params[:id])` で対象の映画を取得
+  - [ ] `@movie.update(movie_params)` で更新処理
+  - [ ] 成功時は index にリダイレクト、flash[:notice] でメッセージ
+  - [ ] 失敗時は edit を再レンダリング、flash[:alert] でエラーメッセージ
+  - [ ] 例外処理を追加（救済処理）
+
+### 3. Movie モデルのバリデーション調整
+
+- [ ] `app/models/movie.rb` を編集
+- [ ] name カラムの一意性制約を編集時に対応
+- [ ] `validates :name, uniqueness: { scope: :id }` または編集対象を除外する仕組みを実装
+
+### 4. edit ビューファイルの作成
+
+- [ ] `app/views/admin/movies/edit.html.erb` ファイルを作成
+- [ ] フォームの基本構造を実装（new.html.erb と同様）
+  - [ ] `form_with model: [:admin, @movie]` を使用
+  - [ ] name フィールド（text_field、ラベル「タイトル」、初期値設定済み）
+  - [ ] year フィールド（text_field、ラベル「公開年」、初期値設定済み）
+  - [ ] description フィールド（text_area、ラベル「概要」、初期値設定済み）
+  - [ ] image_url フィールド（url_field、ラベル「画像 URL」、初期値設定済み）
+  - [ ] is_showing フィールド（check_box、ラベル「上映中」、初期値設定済み）
+  - [ ] submit ボタン（「更新」などの適切なテキスト）
+- [ ] flash メッセージ表示部分を追加
+- [ ] バリデーションエラー表示部分を追加
+
+### 5. index ビューの編集
+
+- [ ] `app/views/admin/movies/index.html.erb` を編集
+- [ ] ID カラムを編集画面へのリンクに変更
+- [ ] `link_to movie.id, edit_admin_movie_path(movie)` として実装
+- [ ] テーブルのヘッダーにも ID カラムを追加（リンクである旨を示す）
+
+### 6. エラーハンドリングの強化
+
+- [ ] Admin::MoviesController の edit, update アクションにエラーハンドリングを追加
+- [ ] レコードが見つからない場合の処理（ActiveRecord::RecordNotFound）
+- [ ] タイトル重複エラーの個別メッセージ
+- [ ] 一般的な DB エラーの処理
+- [ ] 原因不明のエラーの処理
+- [ ] `begin-rescue-end` 文を使用
+
+### 7. Strong Parameters の確認
+
+- [ ] Admin::MoviesController の movie_params メソッドを確認
+- [ ] edit/update でも同じ Strong Parameters を使用
+- [ ] 必要に応じて調整
+
+### 8. 動作確認
+
+- [ ] サーバーを起動（`bundle exec rails server`）
+- [ ] `http://localhost:3000/admin/movies` にアクセス
+- [ ] ID がリンクとして表示されることを確認
+- [ ] ID リンクをクリックして編集画面に移動することを確認
+- [ ] 編集画面で既存の情報がフォームに入っていることを確認
+- [ ] 情報を変更して更新できることを確認
+- [ ] 他の映画と同じタイトルに変更しようとするとエラーメッセージが表示されることを確認
+- [ ] 必須項目を空にした場合のエラー表示を確認
+
+### 9. テスト実行
+
+- [ ] `bundle exec rspec spec/station04/` でテストを実行
+- [ ] すべてのテストが通ることを確認
+
+## 参考情報
+
+### 必要なファイル
+
+- `app/controllers/admin/movies_controller.rb`（編集）
+- `app/views/admin/movies/edit.html.erb`（新規作成）
+- `app/views/admin/movies/index.html.erb`（編集）
+- `app/models/movie.rb`（編集：一意性制約の調整）
+- `config/routes.rb`（編集）
+
+### edit アクションの例
+
+```ruby
+def edit
+  @movie = Movie.find(params[:id])
+rescue ActiveRecord::RecordNotFound
+  flash[:alert] = '指定された映画が見つかりません。'
+  redirect_to admin_movies_path
+end
+```
+
+### update アクションの例
+
+```ruby
+def update
+  @movie = Movie.find(params[:id])
+  if @movie.update(movie_params)
+    flash[:notice] = '映画情報が正常に更新されました。'
+    redirect_to admin_movies_path
+  else
+    flash[:alert] = '映画情報の更新に失敗しました。'
+    render :edit, status: :bad_request
+  end
+rescue ActiveRecord::RecordNotFound
+  flash[:alert] = '指定された映画が見つかりません。'
+  redirect_to admin_movies_path
+end
+```
+
+### ID リンクの例
+
+```erb
+<%= link_to movie.id, edit_admin_movie_path(movie) %>
+```
+
+### 一意性制約の調整例
+
+```ruby
+validates :name, uniqueness: { case_sensitive: false }
+```
+
+### テスト項目（station04）
+
+- GET /admin/movies/:id が 200 ステータスで返される
+- edit フォームが適切に表示される
+- 既存の情報がフォームに事前入力されている
+- PUT /admin/movies/:id で正常に更新できる
+- 他の映画と同じタイトルへの変更が防がれる
+- エラー時に適切な flash メッセージが表示される
+- ID がリンクとして機能し、編集画面に遷移できる
+- 存在しない ID でアクセスした場合の適切なエラーハンドリング
