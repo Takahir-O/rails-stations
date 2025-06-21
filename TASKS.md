@@ -481,3 +481,263 @@ validates :name, uniqueness: { case_sensitive: false }
 - エラー時に適切な flash メッセージが表示される
 - ID がリンクとして機能し、編集画面に遷移できる
 - 存在しない ID でアクセスした場合の適切なエラーハンドリング
+
+---
+
+# lesson-5
+
+## 課題概要
+
+映画の削除機能を実装する。上映が終了した映画を管理画面から完全に削除できるようにし、データベースからレコードを物理的に削除する機能を追加する。
+
+### 要件
+
+- 編集画面の下部に削除ボタンを追加する
+- 削除ボタンを押すと確認ダイアログが表示される
+- Rails の `data-confirm` を利用して確認ダイアログを実装する
+- 確認ダイアログで OK を選択すると `DELETE /admin/movies/:id` が送信される
+- DELETE /admin/movies/:id で指定した ID の映画レコードを物理削除する
+- 削除成功後は映画一覧画面に遷移し、flash メッセージで削除完了を通知する
+- エラー時には適切なエラーハンドリングを行う
+
+## 実装手順
+
+### 1. ルーティングの設定
+
+- [ ] `config/routes.rb` を編集
+- [ ] admin 名前空間の movies に destroy アクションを追加
+- [ ] `namespace :admin do resources :movies, only: [:index, :new, :create, :edit, :update, :destroy] end`
+
+#### 🔍 **初学者向け詳細説明**
+
+ルーティングとは「どの URL にアクセスしたら、どのコントローラーのどのメソッドが動くか」を決める設定です。
+`destroy` アクションを追加することで、DELETE リクエストを受け取れるようになります。
+
+### 2. Admin::MoviesController の拡張
+
+- [ ] `app/controllers/admin/movies_controller.rb` を編集
+- [ ] destroy アクションを追加
+  - [ ] `Movie.find(params[:id])` で削除対象の映画を取得
+  - [ ] `@movie.destroy` で物理削除を実行
+  - [ ] 成功時は index にリダイレクト、flash[:notice] でメッセージ
+  - [ ] 例外処理を追加（レコードが見つからない場合など）
+
+#### 🔍 **初学者向け詳細説明**
+
+- `find(params[:id])`: URL の `:id` 部分から映画を探す
+- `destroy`: データベースから完全に削除する（物理削除）
+- `flash[:notice]`: ユーザーに「削除しました」と伝えるメッセージ
+
+### 3. edit ビューファイルの編集
+
+- [ ] `app/views/admin/movies/edit.html.erb` を編集
+- [ ] 既存の更新フォームの下に削除ボタンを追加
+- [ ] `link_to` で削除ボタンを作成
+  - [ ] URL: `admin_movie_path(@movie)`
+  - [ ] HTTP メソッド: `DELETE`
+  - [ ] `data-confirm` オプションで確認ダイアログを設定
+  - [ ] ボタンのスタイリング（色を赤系にして危険なアクションであることを示す）
+
+#### 🔍 **初学者向け詳細説明**
+
+- `link_to`: リンクやボタンを作る Rails のヘルパーメソッド
+- `method: :delete`: このリンクが DELETE リクエストを送ることを指定
+- `data-confirm`: クリック時に確認ダイアログを表示する機能
+
+### 4. 削除ボタンの実装詳細
+
+- [ ] 削除ボタンのテキストを「削除」に設定
+- [ ] 確認ダイアログのメッセージを適切に設定
+  - [ ] 例：「この映画を削除しますか？削除すると元に戻せません。」
+- [ ] ボタンの見た目を危険なアクションらしく設定
+  - [ ] 背景色を赤系にする
+  - [ ] テキスト色を白にする
+  - [ ] 他のボタンと区別できるようにする
+
+#### 🔍 **初学者向け詳細説明**
+
+削除は取り消せない危険な操作なので、ユーザーが間違えないよう以下の工夫をします：
+
+1. **確認ダイアログ**: 本当に削除するか確認
+2. **赤色**: 危険を表す色で注意を促す
+3. **明確なメッセージ**: 削除すると元に戻せないことを伝える
+
+### 5. エラーハンドリングの実装
+
+- [ ] Admin::MoviesController の destroy アクションにエラーハンドリングを追加
+- [ ] レコードが見つからない場合の処理（ActiveRecord::RecordNotFound）
+- [ ] 削除に失敗した場合の処理
+- [ ] 一般的な例外の処理
+- [ ] `begin-rescue-end` 文を使用
+
+#### 🔍 **初学者向け詳細説明**
+
+エラーハンドリングとは「何か問題が起きた時の対処法」を事前に決めておくことです。
+例：存在しない映画を削除しようとした場合、エラー画面ではなく適切なメッセージを表示する
+
+### 6. Flash メッセージの設定
+
+- [ ] 削除成功時のメッセージを設定
+  - [ ] `flash[:notice] = '映画が正常に削除されました。'`
+- [ ] エラー時のメッセージを設定
+  - [ ] `flash[:alert] = '映画の削除に失敗しました。'`
+  - [ ] `flash[:alert] = '指定された映画が見つかりません。'`
+
+#### 🔍 **初学者向け詳細説明**
+
+Flash メッセージは、ユーザーに操作の結果を伝える仕組みです。
+
+- 成功時: 緑色で「削除しました」
+- 失敗時: 赤色で「削除できませんでした」
+
+### 7. JavaScript の動作確認
+
+- [ ] `data-confirm` が正しく動作することを確認
+- [ ] 確認ダイアログで「キャンセル」を選んだ場合、削除されないことを確認
+- [ ] 確認ダイアログで「OK」を選んだ場合、削除が実行されることを確認
+
+#### 🔍 **初学者向け詳細説明**
+
+`data-confirm` は Rails が提供する便利な機能で、JavaScript が自動的に確認ダイアログを表示してくれます。
+特別な JavaScript コードを書く必要はありません！
+
+### 8. 動作確認
+
+- [ ] サーバーを起動（`bundle exec rails server`）
+- [ ] `http://localhost:3000/admin/movies` にアクセス
+- [ ] 映画を一つ作成する（テスト用）
+- [ ] その映画の編集画面に移動
+- [ ] 削除ボタンが表示されることを確認
+- [ ] 削除ボタンをクリックして確認ダイアログが表示されることを確認
+- [ ] 「キャンセル」を選んで削除されないことを確認
+- [ ] 「OK」を選んで削除が実行されることを確認
+- [ ] 削除後、一覧画面に戻り flash メッセージが表示されることを確認
+- [ ] 削除した映画が一覧から消えていることを確認
+
+#### 🔍 **初学者向け詳細説明**
+
+動作確認は「作った機能が正しく動くか」をチェックする重要な作業です。
+実際にボタンを押してみて、期待通りの動作をするか確認しましょう。
+
+### 9. エッジケースのテスト
+
+- [ ] 存在しない ID で削除を試行する
+  - [ ] URL を直接入力：`http://localhost:3000/admin/movies/999/edit`
+  - [ ] 削除ボタンをクリック
+  - [ ] 適切なエラーメッセージが表示されることを確認
+- [ ] 同じ映画を連続で削除しようとする
+  - [ ] 2 回目はエラーになることを確認
+
+#### 🔍 **初学者向け詳細説明**
+
+エッジケースとは「普通ではない使い方」や「予期しない操作」のことです。
+悪意のあるユーザーや、間違った操作をするユーザーに対しても適切に対応できるかテストします。
+
+### 10. テスト実行
+
+- [ ] `bundle exec rspec spec/station05/` でテストを実行
+- [ ] すべてのテストが通ることを確認
+
+## 参考情報
+
+### 必要なファイル
+
+- `app/controllers/admin/movies_controller.rb`（編集）
+- `app/views/admin/movies/edit.html.erb`（編集）
+- `config/routes.rb`（編集）
+
+### destroy アクションの例
+
+```ruby
+def destroy
+  @movie = Movie.find(params[:id])
+  @movie.destroy
+  flash[:notice] = '映画が正常に削除されました。'
+  redirect_to admin_movies_path
+rescue ActiveRecord::RecordNotFound
+  flash[:alert] = '指定された映画が見つかりません。'
+  redirect_to admin_movies_path
+rescue => e
+  flash[:alert] = '映画の削除に失敗しました。'
+  redirect_to admin_movies_path
+end
+```
+
+### 削除ボタンの例
+
+```erb
+<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ccc;">
+  <%= link_to "削除",
+              admin_movie_path(@movie),
+              method: :delete,
+              data: { confirm: "この映画を削除しますか？削除すると元に戻せません。" },
+              style: "background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;" %>
+</div>
+```
+
+### ルーティングの確認
+
+削除機能を追加後、以下のコマンドでルーティングを確認できます：
+
+```bash
+bundle exec rails routes | grep admin
+```
+
+以下のような出力が表示されれば成功です：
+
+```
+admin_movies     GET    /admin/movies               admin/movies#index
+new_admin_movie  GET    /admin/movies/new           admin/movies#new
+admin_movies     POST   /admin/movies               admin/movies#create
+edit_admin_movie GET    /admin/movies/:id/edit      admin/movies#edit
+admin_movie      PUT    /admin/movies/:id           admin/movies#update
+admin_movie      DELETE /admin/movies/:id           admin/movies#destroy
+```
+
+### CSS スタイルの参考
+
+削除ボタンを目立たせるためのスタイル例：
+
+```css
+.delete-button {
+  background-color: #dc3545;
+  color: white;
+  padding: 10px 20px;
+  text-decoration: none;
+  border-radius: 4px;
+  margin-left: 10px;
+}
+
+.delete-button:hover {
+  background-color: #c82333;
+  color: white;
+  text-decoration: none;
+}
+```
+
+### テスト項目（station05）
+
+- GET /admin/movies/:id/edit で削除ボタンが表示される
+- 削除ボタンクリック時に確認ダイアログが表示される
+- 確認ダイアログで「キャンセル」を選んだ場合、削除されない
+- 確認ダイアログで「OK」を選んだ場合、DELETE リクエストが送信される
+- DELETE /admin/movies/:id で正常に削除できる
+- 削除後、管理画面一覧に遷移する
+- 削除成功時に適切な flash メッセージが表示される
+- 存在しない ID での削除試行時に適切なエラーハンドリングが行われる
+- 削除されたレコードが一覧から消えている
+
+### 🎯 **初学者向け重要ポイント**
+
+1. **物理削除とは**: データベースから完全にレコードを削除すること
+2. **data-confirm**: Rails の便利機能で、簡単に確認ダイアログを作れる
+3. **エラーハンドリング**: 問題が起きた時の対処法を事前に用意すること
+4. **Flash メッセージ**: ユーザーに操作結果を伝える仕組み
+5. **RESTful**: Rails の標準的な設計パターン（GET、POST、PUT、DELETE）
+
+### 🚨 **注意事項**
+
+- 削除は元に戻せない操作なので、必ず確認ダイアログを設置する
+- エラーハンドリングを忘れずに実装する
+- ユーザーにとって分かりやすいメッセージを心がける
+- テストは様々なパターンで行う（正常系、異常系両方）

@@ -1,8 +1,9 @@
 Rails.application.routes.draw do
   get "movies", to: "movies#index"
   namespace :admin do
-    resources :movies, only: [:index, :new, :create, :edit, :update]
+    resources :movies, only: [:index, :new, :create, :edit, :update, :destroy]
   end
+  
   
 
 
@@ -13,5 +14,5 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
   # Defines the root path route ("/")
-  # root "posts#index"
+  root "movies#index"
 end
