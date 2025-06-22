@@ -426,8 +426,6 @@ end
 
 - `app/controllers/admin/movies_controller.rb`（編集）
 - `app/views/admin/movies/edit.html.erb`（新規作成）
-- `app/views/admin/movies/index.html.erb`（編集）
-- `app/models/movie.rb`（編集：一意性制約の調整）
 - `config/routes.rb`（編集）
 
 ### edit アクションの例
@@ -724,8 +722,7 @@ admin_movie      DELETE /admin/movies/:id           admin/movies#destroy
 - DELETE /admin/movies/:id で正常に削除できる
 - 削除後、管理画面一覧に遷移する
 - 削除成功時に適切な flash メッセージが表示される
-- 存在しない ID での削除試行時に適切なエラーハンドリングが行われる
-- 削除されたレコードが一覧から消えている
+- 存在しない ID での削除試行時に適切なエラーハンドリング
 
 ### 🎯 **初学者向け重要ポイント**
 
@@ -741,6 +738,14 @@ admin_movie      DELETE /admin/movies/:id           admin/movies#destroy
 - エラーハンドリングを忘れずに実装する
 - ユーザーにとって分かりやすいメッセージを心がける
 - テストは様々なパターンで行う（正常系、異常系両方）
+
+### 🔧 **発展課題（余裕があれば）**
+
+- ページネーション機能の追加（kaminari gem など）
+- 検索履歴の保存機能
+- オートコンプリート機能
+- ソート機能（公開年順、タイトル順など）
+- お気に入り機能との連携
 
 ---
 
@@ -840,6 +845,30 @@ def index
   @movies = @movies.search_by_keyword(params[:keyword]) if params[:keyword].present?
   @movies = @movies.filter_by_showing(params[:is_showing]) if params[:is_showing].present?
 end
+```
+
+```erb
+<!-- View での座席表表示例 -->
+<%= form_with url: movies_path, method: :get, local: true do |f| %>
+  <div>
+    <%= text_field_tag :keyword, params[:keyword], placeholder: "映画タイトルまたは概要で検索" %>
+  </div>
+
+  <div>
+    <%= radio_button_tag :is_showing, '', checked: params[:is_showing].blank? %>
+    <%= label_tag :is_showing_, "すべて" %>
+
+    <%= radio_button_tag :is_showing, '1', checked: params[:is_showing] == '1' %>
+    <%= label_tag :is_showing_1, "公開中" %>
+
+    <%= radio_button_tag :is_showing, '0', checked: params[:is_showing] == '0' %>
+    <%= label_tag :is_showing_0, "公開予定" %>
+  </div>
+
+  <div>
+    <%= submit_tag "検索" %>
+  </div>
+<% end %>
 ```
 
 #### 🔍 **初学者向け詳細説明**
@@ -1077,3 +1106,429 @@ end
 - オートコンプリート機能
 - ソート機能（公開年順、タイトル順など）
 - お気に入り機能との連携
+
+---
+
+# lesson-7
+
+## 課題概要
+
+映画館の座席表を表示する機能を実装する。座席予約機能の第一歩として、スクリーンに対しての座席の位置と座席の番号を表形式で表示できるようにする。
+
+### 要件
+
+- GET /sheets で座席表を表示する
+- sheets テーブルに座席表マスターデータを格納する
+- マスターデータを元にループ処理で座席表を表示する
+- table タグを使用して表形式で座席表を表示する
+- 座席配置は 3 行 5 列（a-1 から c-5）でスクリーンが上部に表示される
+
+### 座席配置
+
+```
+|.    |.    |スクリーン|.    |.    |
+|-----|-----|-------|-----|-----|
+| a-1 | a-2 | a-3   | a-4 | a-5 |
+| b-1 | b-2 | b-3   | b-4 | b-5 |
+| c-1 | c-2 | c-3   | c-4 | c-5 |
+```
+
+### テーブル仕様
+
+```sql
+CREATE TABLE IF NOT EXISTS `railway`.`sheets` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `column` TINYINT(5) NOT NULL,
+  `row` VARCHAR(1) NOT NULL,
+  PRIMARY KEY (`id`)
+)
+```
+
+### マスターデータ
+
+```sql
+INSERT INTO `sheets` VALUES
+(1, 1, 'a'), (2, 2, 'a'), (3, 3, 'a'), (4, 4, 'a'), (5, 5, 'a'),
+(6, 1, 'b'), (7, 2, 'b'), (8, 3, 'b'), (9, 4, 'b'), (10, 5, 'b'),
+(11, 1, 'c'), (12, 2, 'c'), (13, 3, 'c'), (14, 4, 'c'), (15, 5, 'c');
+```
+
+## 実装手順
+
+### 1. Sheet モデルの作成
+
+- [ ] `app/models/sheet.rb` ファイルを作成
+- [ ] ApplicationRecord を継承した Sheet クラスを定義
+- [ ] 必要な属性：id, column, row
+
+#### 🔍 **初学者向け詳細説明**
+
+Sheet モデルは座席情報を管理するためのモデルです。
+各座席は行（row）と列（column）で位置を特定します。
+
+### 2. マイグレーションファイルの作成
+
+- [ ] `bundle exec rails generate migration CreateSheets` でマイグレーション生成
+- [ ] または手動で `db/migrate/YYYYMMDD_create_sheets.rb` を作成
+- [ ] テーブル定義を実装
+  - [ ] `t.integer :column, null: false` (列番号)
+  - [ ] `t.string :row, limit: 1, null: false` (行記号)
+  - [ ] インデックスの追加を検討
+
+#### 🔍 **初学者向け詳細説明**
+
+マイグレーションはデータベースのテーブル構造を管理するための機能です。
+座席テーブルには列番号（1-5）と行記号（a-c）を格納します。
+
+### 3. シードデータの作成
+
+- [ ] `db/seeds.rb` ファイルを編集
+- [ ] 座席マスターデータの投入処理を追加
+- [ ] 重複データの考慮（既存データがある場合のハンドリング）
+
+```ruby
+# 座席マスターデータの投入例
+seats_data = [
+  { column: 1, row: 'a' }, { column: 2, row: 'a' }, { column: 3, row: 'a' }, { column: 4, row: 'a' }, { column: 5, row: 'a' },
+  { column: 1, row: 'b' }, { column: 2, row: 'b' }, { column: 3, row: 'b' }, { column: 4, row: 'b' }, { column: 5, row: 'b' },
+  { column: 1, row: 'c' }, { column: 2, row: 'c' }, { column: 3, row: 'c' }, { column: 4, row: 'c' }, { column: 5, row: 'c' }
+]
+
+seats_data.each do |seat|
+  Sheet.find_or_create_by(seat)
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+シードデータは開発やテスト用の初期データです。
+`find_or_create_by` を使用することで重複登録を防げます。
+
+### 4. SheetsController の作成
+
+- [ ] `app/controllers/sheets_controller.rb` ファイルを作成
+- [ ] ApplicationController を継承した SheetsController クラスを定義
+- [ ] index アクションを実装
+  - [ ] `Sheet.all` で全座席データを取得
+  - [ ] 行（row）でグループ化して座席配置を整理
+  - [ ] `@seats_by_row` インスタンス変数に代入
+
+#### 🔍 **初学者向け詳細説明**
+
+座席表を表示するため、データベースから座席情報を取得し、
+行ごとにグループ化して表示しやすい形に整理します。
+
+### 5. ルーティングの設定
+
+- [ ] `config/routes.rb` を編集
+- [ ] `resources :sheets, only: [:index]` または `get '/sheets', to: 'sheets#index'` を追加
+
+#### 🔍 **初学者向け詳細説明**
+
+`GET /sheets` のルーティングを設定することで、
+ブラウザから `/sheets` にアクセスした時に座席表が表示されます。
+
+### 6. View ファイルの作成
+
+- [ ] `app/views/sheets` ディレクトリを作成
+- [ ] `app/views/sheets/index.html.erb` ファイルを作成
+- [ ] HTML ファイルの基本構造を作成（DOCTYPE html を含む）
+- [ ] スクリーン表示部分を実装
+- [ ] 座席表の table 構造を実装
+  - [ ] thead でヘッダー部分（スクリーン表示）
+  - [ ] tbody で座席配置
+  - [ ] 行ごとにループして各座席を表示
+  - [ ] 座席番号の表示（例：a-1, b-2）
+
+#### 🔍 **初学者向け詳細説明**
+
+座席表は以下の構造で表示します：
+
+- 上部にスクリーン表示
+- 3 行 5 列の座席配置
+- 各座席は「行記号-列番号」で表示（例：a-1）
+
+### 7. 座席表示ロジックの実装
+
+- [ ] SheetsController で座席データを行ごとに整理
+- [ ] ビューで座席配置を table で表現
+- [ ] スクリーン位置の表示
+- [ ] 座席番号のフォーマット設定
+
+```ruby
+# Controller での座席データ整理例
+def index
+  @seats_by_row = Sheet.all.group_by(&:row).sort
+end
+```
+
+```erb
+<!-- View での座席表表示例 -->
+<table class="seat-map">
+  <thead>
+    <tr>
+      <th colspan="5" class="screen">スクリーン</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @seats_by_row.each do |row, seats| %>
+      <tr>
+        <% seats.sort_by(&:column).each do |seat| %>
+          <td class="seat"><%= seat.seat_number %></td>
+        <% end %>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `group_by(&:row)`: 行ごとに座席をグループ化
+- `sort_by(&:column)`: 列番号順でソート
+- `colspan="5"`: スクリーン表示を 5 列分に拡張
+
+### 8. CSS スタイリングの追加
+
+- [ ] 座席表のスタイリングを実装
+- [ ] スクリーン部分の装飾
+- [ ] 座席の見た目を整える
+- [ ] レスポンシブ対応を検討
+
+```css
+/* 座席表のスタイル例 */
+.seat-map {
+  margin: 20px auto;
+  border-collapse: collapse;
+}
+
+.seat-map th,
+.seat-map td {
+  border: 1px solid #ddd;
+  padding: 15px;
+  text-align: center;
+}
+
+.screen {
+  background-color: #333;
+  color: white;
+  font-weight: bold;
+}
+
+.seat {
+  background-color: #f8f9fa;
+}
+
+.seat:hover {
+  background-color: #e9ecef;
+}
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+座席表は映画館らしい見た目にするため、適切なスタイリングを施します。
+将来的に座席選択機能を追加することも考慮した設計にします。
+
+### 9. データベースマイグレーション実行
+
+- [ ] `bundle exec rails db:migrate` でマイグレーション実行
+- [ ] `bundle exec rails db:seed` でシードデータ投入
+- [ ] データが正しく投入されたか確認
+
+#### 🔍 **初学者向け詳細説明**
+
+データベースの準備：
+
+1. マイグレーション実行でテーブル作成
+2. シードデータ投入で座席マスターデータ登録
+3. Rails console で確認: `Sheet.count` → 15 件表示されることを確認
+
+### 10. 動作確認
+
+- [ ] サーバーを起動（`bundle exec rails server`）
+- [ ] `http://localhost:3000/sheets` にアクセス
+- [ ] HTTP ステータス 200 が返されることを確認
+- [ ] HTML が返されることを確認（DOCTYPE html が含まれる）
+- [ ] table タグで座席表が表示されることを確認
+- [ ] スクリーン表示が上部にあることを確認
+- [ ] 3 行 5 列の座席配置が正しく表示されることを確認
+- [ ] 各座席が「行記号-列番号」形式で表示されることを確認
+
+#### 🔍 **初学者向け詳細説明**
+
+動作確認は「作った機能が正しく動くか」をチェックする重要な作業です。
+実際にボタンを押してみて、期待通りの動作をするか確認しましょう。
+
+### 11. エラーハンドリング
+
+- [ ] データベース接続エラーの処理
+- [ ] シードデータが投入されていない場合の処理
+- [ ] 座席データが不正な場合の処理
+
+#### 🔍 **初学者向け詳細説明**
+
+座席表機能では以下のエラーを考慮します：
+
+- データベースにアクセスできない場合
+- 座席データが存在しない場合
+- データが破損している場合
+
+### 12. テスト実行
+
+- [ ] `bundle exec rspec spec/station07/` でテストを実行
+- [ ] すべてのテストが通ることを確認
+
+## 参考情報
+
+### 必要なファイル
+
+- `app/models/sheet.rb`（新規作成）
+- `app/controllers/sheets_controller.rb`（新規作成）
+- `app/views/sheets/index.html.erb`（新規作成）
+- `db/migrate/YYYYMMDD_create_sheets.rb`（新規作成）
+- `db/seeds.rb`（編集）
+- `config/routes.rb`（編集）
+
+### Sheet モデルの例
+
+```ruby
+class Sheet < ApplicationRecord
+  validates :column, presence: true, inclusion: { in: 1..5 }
+  validates :row, presence: true, inclusion: { in: %w[a b c] }
+
+  def seat_number
+    "#{row}-#{column}"
+  end
+end
+```
+
+### SheetsController の例
+
+```ruby
+class SheetsController < ApplicationController
+  def index
+    @seats_by_row = Sheet.all.group_by(&:row).sort
+  rescue => e
+    flash[:alert] = '座席情報の取得に失敗しました。'
+    @seats_by_row = {}
+  end
+end
+```
+
+### マイグレーションファイルの例
+
+```ruby
+class CreateSheets < ActiveRecord::Migration[7.0]
+  def change
+    create_table :sheets do |t|
+      t.integer :column, null: false
+      t.string :row, limit: 1, null: false
+
+      t.timestamps
+    end
+
+    add_index :sheets, [:row, :column], unique: true
+  end
+end
+```
+
+### ビューファイルの例
+
+```erb
+<!DOCTYPE html>
+<html>
+<head>
+  <title>座席表</title>
+  <style>
+    .seat-map {
+      margin: 20px auto;
+      border-collapse: collapse;
+    }
+    .seat-map th, .seat-map td {
+      border: 1px solid #ddd;
+      padding: 15px;
+      text-align: center;
+    }
+    .screen {
+      background-color: #333;
+      color: white;
+      font-weight: bold;
+    }
+    .seat {
+      background-color: #f8f9fa;
+    }
+  </style>
+</head>
+<body>
+  <h1>座席表</h1>
+
+  <table class="seat-map">
+    <thead>
+      <tr>
+        <th colspan="5" class="screen">スクリーン</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @seats_by_row.each do |row, seats| %>
+        <tr>
+          <% seats.sort_by(&:column).each do |seat| %>
+            <td class="seat"><%= seat.seat_number %></td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</body>
+</html>
+```
+
+### シードデータの例
+
+```ruby
+# db/seeds.rb
+puts "座席マスターデータを投入中..."
+
+seats_data = [
+  { column: 1, row: 'a' }, { column: 2, row: 'a' }, { column: 3, row: 'a' }, { column: 4, row: 'a' }, { column: 5, row: 'a' },
+  { column: 1, row: 'b' }, { column: 2, row: 'b' }, { column: 3, row: 'b' }, { column: 4, row: 'b' }, { column: 5, row: 'b' },
+  { column: 1, row: 'c' }, { column: 2, row: 'c' }, { column: 3, row: 'c' }, { column: 4, row: 'c' }, { column: 5, row: 'c' }
+]
+
+seats_data.each do |seat|
+  Sheet.find_or_create_by(seat)
+end
+```
+
+### テスト項目（station07）
+
+- GET /sheets が 200 ステータスで返される
+- HTML が返される（DOCTYPE html が含まれる）
+- table タグが使用されている
+- スクリーン表示が上部にある
+- 3 行 5 列の座席配置が正しく表示される
+- 各座席が「行記号-列番号」形式で表示される
+- 全 15 席が表示される
+- 座席データがデータベースから正しく取得される
+
+### 🎯 **初学者向け重要ポイント**
+
+1. **マスターデータ**: 変更されない基本的なデータの管理方法
+2. **シードデータ**: 開発・テスト用の初期データ投入機能
+3. **group_by**: データを特定の条件でグループ化する便利な機能
+4. **テーブル表示**: HTML の table タグを使った構造化されたデータ表示
+5. **座席配置**: 実際の映画館を模した直感的なレイアウト設計
+
+### 🚨 **注意事項**
+
+- マイグレーション実行前にデータベースのバックアップを取る
+- シードデータは重複実行を考慮した実装にする
+- 座席表示は将来の予約機能拡張を考慮した設計にする
+- レスポンシブデザインを考慮して様々な画面サイズで確認する
+
+### 🔧 **発展課題（余裕があれば）**
+
+- 座席の空席/予約済み状態表示
+- 座席種別（通常席/プレミアム席など）の追加
+- スクリーンサイズや座席レイアウトの動的変更機能
+- 座席表のズーム機能
+- アクセシビリティ対応（スクリーンリーダー対応など）
