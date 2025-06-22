@@ -116,3 +116,39 @@
   /* 上下のマージンを15pxに設定 */
   margin:15px 0;
 }
+
+
+/* 座席表のスタイル設定 */
+.seat-map{
+  margin: 20px auto;
+  border-collapse: collapse;
+}
+
+.seat-map th,
+.seat-map td{
+  border: 1px solid #ddd;
+  padding:15px;
+  text-align: center;
+  width: 80px;
+}
+
+.screen{
+  background-color: #333;
+  font-weight: bold;
+  color: #fff;
+}
+
+.row-label{
+  background-color: #f0f0f0;
+  font-weight: bold;
+  width: 50px;
+}
+
+.seat{
+  background-color: #f8f9fa;
+}
+
+.seat:hover{
+  background-color: #e9ecef;
+  cursor: pointer;
+}

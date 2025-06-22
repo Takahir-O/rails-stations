@@ -30,3 +30,20 @@ Movie.create!([
     is_showing: false
   }
 ])
+
+# 座席情報を作成
+
+seats_data = [
+  { column: 1, row: 'a' }, { column: 2, row: 'a' }, { column: 3, row: 'a' }, { column: 4, row: 'a' }, { column: 5, row: 'a' },
+  { column: 1, row: 'b' }, { column: 2, row: 'b' }, { column: 3, row: 'b' }, { column: 4, row: 'b' }, { column: 5, row: 'b' },
+  { column: 1, row: 'c' }, { column: 2, row: 'c' }, { column: 3, row: 'c' }, { column: 4, row: 'c' }, { column: 5, row: 'c' }
+]
+
+
+seats_data.each do |seat|
+  Sheet.find_or_create_by(seat)
+end
+
+puts "シードデータの作成が完了しました"
+puts "映画: #{Movie.count}件"
+puts "座席: #{Sheet.count}件"

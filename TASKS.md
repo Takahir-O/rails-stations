@@ -1532,3 +1532,484 @@ end
 - スクリーンサイズや座席レイアウトの動的変更機能
 - 座席表のズーム機能
 - アクセシビリティ対応（スクリーンリーダー対応など）
+
+---
+
+# lesson-8
+
+## 課題概要
+
+映画作品の詳細ページと上映スケジュール表示機能を実装する。各映画の詳細情報を表示し、上映中の映画にはその映画に紐づく上映スケジュールも表示する。
+
+### 要件
+
+- GET /movies/:id で指定した ID の映画作品詳細ページを表示する
+- 映画の全カラム情報を表示する
+- 画像は img タグで表示する
+- その映画作品に紐づく上映スケジュールをすべて表示する
+- Schedules モデルを作成し、Movies との 1 対 N の関係を設定する
+- 上映開始時刻と終了時刻を表示する
+
+### テーブル仕様
+
+schedules テーブル:
+
+- id: 主キー
+- movie_id: movies テーブルへの外部キー
+- start_time: 上映開始時刻（TIME 型）
+- end_time: 上映終了時刻（TIME 型）
+- created_at, updated_at: タイムスタンプ
+
+## 実装手順
+
+### 1. Schedule モデルの作成
+
+- [ ] `app/models/schedule.rb` ファイルを作成
+- [ ] ApplicationRecord を継承した Schedule クラスを定義
+- [ ] 必要な属性：id, movie_id, start_time, end_time
+- [ ] Movie モデルとのアソシエーション設定（belongs_to :movie）
+
+#### 🔍 **初学者向け詳細説明**
+
+Schedule モデルは映画の上映スケジュール情報を管理するためのモデルです。
+各スケジュールは特定の映画に紐づき、開始時刻と終了時刻を持ちます。
+
+### 2. マイグレーションファイルの作成
+
+- [ ] `docker compose exec web bundle exec rails generate migration CreateSchedules` でマイグレーション生成
+- [ ] または手動で `db/migrate/YYYYMMDD_create_schedules.rb` を作成
+- [ ] テーブル定義を実装
+  - [ ] `t.references :movie, null: false, foreign_key: true` (映画への外部キー)
+  - [ ] `t.time :start_time, null: false` (上映開始時刻)
+  - [ ] `t.time :end_time, null: false` (上映終了時刻)
+  - [ ] インデックスの追加（movie_id）
+
+#### 🔍 **初学者向け詳細説明**
+
+外部キーを使用することで、どの映画にどのスケジュールが紐づくかを管理できます。
+TIME 型を使用することで時刻のみを効率的に格納できます。
+
+### 3. Movie モデルの拡張
+
+- [ ] `app/models/movie.rb` を編集
+- [ ] Schedule モデルとのアソシエーション設定（has_many :schedules）
+- [ ] 上映中の映画かどうかを判定するメソッドを追加（必要に応じて）
+
+#### 🔍 **初学者向け詳細説明**
+
+1 対 N の関係では、「1」側のモデル（Movie）に `has_many`、
+「N」側のモデル（Schedule）に `belongs_to` を設定します。
+
+### 4. ルーティングの設定
+
+- [ ] `config/routes.rb` を編集
+- [ ] movies に show アクションを追加
+- [ ] `resources :movies, only: [:index, :show]` に変更
+
+#### 🔍 **初学者向け詳細説明**
+
+show アクションを追加することで、個別の映画詳細ページにアクセスできるようになります。
+URL: `/movies/1`, `/movies/2` など
+
+### 5. MoviesController の拡張
+
+- [ ] `app/controllers/movies_controller.rb` を編集
+- [ ] show アクションを追加
+  - [ ] `Movie.find(params[:id])` で指定 ID の映画を取得
+  - [ ] @movie インスタンス変数に代入
+  - [ ] 関連する上映スケジュールも取得（@movie.schedules）
+  - [ ] レコードが見つからない場合の例外処理
+
+#### 🔍 **初学者向け詳細説明**
+
+show アクションでは、URL の :id パラメータを使用して特定の映画データを取得します。
+同時に、その映画に紐づく上映スケジュールも取得します。
+
+### 6. 映画一覧ページの編集
+
+- [ ] `app/views/movies/index.html.erb` を編集
+- [ ] 各映画のタイトルを詳細ページへのリンクに変更
+- [ ] `link_to movie.name, movie_path(movie)` として実装
+
+#### 🔍 **初学者向け詳細説明**
+
+映画一覧ページから詳細ページに遷移できるようにリンクを設置します。
+ユーザーが映画タイトルをクリックすると詳細ページに移動します。
+
+### 7. 映画詳細ページの作成
+
+- [ ] `app/views/movies/show.html.erb` ファイルを作成
+- [ ] HTML ファイルの基本構造を作成（DOCTYPE html を含む）
+- [ ] 映画の詳細情報表示部分を実装
+  - [ ] 映画タイトル（name）
+  - [ ] 公開年（year）
+  - [ ] 概要（description）
+  - [ ] 画像（image_url を img タグで表示）
+  - [ ] 上映状況（is_showing）
+- [ ] 上映スケジュール表示部分を実装
+  - [ ] 上映中の映画の場合のみスケジュール表示
+  - [ ] table タグで上映時間を表示
+  - [ ] 開始時刻と終了時刻を表示
+
+#### 🔍 **初学者向け詳細説明**
+
+詳細ページでは映画のすべての情報を表示します。
+上映中の映画（is_showing が true）の場合のみ、上映スケジュールを表示します。
+
+### 8. 上映スケジュール表示の実装
+
+- [ ] 上映中かどうかの判定ロジック実装
+- [ ] 上映スケジュール一覧の表示
+- [ ] 時刻の表示フォーマット設定
+- [ ] スケジュールがない場合のメッセージ表示
+
+```erb
+<!-- 上映スケジュール表示例 -->
+<% if @movie.is_showing? %>
+  <h3>上映スケジュール</h3>
+  <% if @movie.schedules.any? %>
+    <table class="schedule-table">
+      <thead>
+        <tr>
+          <th>上映開始時刻</th>
+          <th>上映終了時刻</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @movie.schedules.each do |schedule| %>
+          <tr>
+            <td><%= schedule.start_time.strftime("%H:%M") %></td>
+            <td><%= schedule.end_time.strftime("%H:%M") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p>上映スケジュールはまだ決まっていません。</p>
+  <% end %>
+<% end %>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `is_showing?`: 上映中かどうかを判定
+- `schedules.any?`: スケジュールが存在するかを確認
+- `strftime("%H:%M")`: 時刻を「HH:MM」形式で表示
+
+### 9. バリデーションの追加
+
+- [ ] Schedule モデルにバリデーションを追加
+  - [ ] movie_id の presence バリデーション
+  - [ ] start_time の presence バリデーション
+  - [ ] end_time の presence バリデーション
+  - [ ] 終了時刻が開始時刻より後であることのバリデーション
+
+#### 🔍 **初学者向け詳細説明**
+
+データの整合性を保つため、適切なバリデーションを設定します。
+特に、終了時刻が開始時刻より後であることは重要な制約です。
+
+### 10. テストデータの作成
+
+- [ ] `db/seeds.rb` ファイルを編集
+- [ ] 上映スケジュールのテストデータを追加
+- [ ] 複数の映画に対して複数のスケジュールを作成
+
+```ruby
+# 上映スケジュールのテストデータ例
+if Movie.exists?
+  Movie.where(is_showing: true).each do |movie|
+    # 1日3回上映のスケジュール例
+    [
+      { start_time: '10:00', end_time: '12:00' },
+      { start_time: '14:00', end_time: '16:00' },
+      { start_time: '18:00', end_time: '20:00' }
+    ].each do |schedule_data|
+      movie.schedules.find_or_create_by(schedule_data)
+    end
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+テストデータでは上映中の映画に対してのみスケジュールを作成します。
+実際の映画館のように 1 日複数回上映されることを想定しています。
+
+### 11. エラーハンドリング
+
+- [ ] MoviesController の show アクションにエラーハンドリングを追加
+- [ ] レコードが見つからない場合の処理（ActiveRecord::RecordNotFound）
+- [ ] データベースエラーの処理
+- [ ] 404 ページへのリダイレクトまたは適切なエラーメッセージ
+
+#### 🔍 **初学者向け詳細説明**
+
+存在しない映画 ID でアクセスされた場合のエラーハンドリングが重要です。
+ユーザーフレンドリーなエラーメッセージを表示しましょう。
+
+### 12. データベースマイグレーション実行
+
+- [ ] `docker compose exec web bundle exec rails db:migrate` でマイグレーション実行
+- [ ] `docker compose exec web bundle exec rails db:seed` でシードデータ投入
+- [ ] `docker compose exec web bundle exec rails console` でコンソールを開き、データが正しく投入されたか確認
+
+#### 🔍 **初学者向け詳細説明**
+
+マイグレーション実行で schedules テーブルが作成され、
+シードデータ投入で上映スケジュールのテストデータが登録されます。
+
+### 13. 動作確認
+
+- [ ] サーバーを起動（`docker compose up`）
+- [ ] `http://localhost:3000/movies` にアクセス
+- [ ] 映画タイトルがリンクになっていることを確認
+- [ ] 映画タイトルをクリックして詳細ページに移動することを確認
+- [ ] `http://localhost:3000/movies/1` で詳細ページが表示されることを確認
+- [ ] 映画の全カラム情報が表示されることを確認
+- [ ] 画像が img タグで表示されることを確認
+- [ ] 上映中の映画の場合、上映スケジュールが表示されることを確認
+- [ ] 上映予定の映画の場合、スケジュールが表示されないことを確認
+
+#### 🔍 **初学者向け詳細説明**
+
+動作確認では、実際のユーザーの操作を想定してテストします。
+一覧ページから詳細ページへの遷移、詳細情報の表示など、
+すべての機能が正しく動作することを確認しましょう。
+
+### 14. スタイリングの追加
+
+- [ ] 詳細ページのスタイリングを実装
+- [ ] 映画情報の見やすいレイアウト
+- [ ] 上映スケジュール表のスタイリング
+- [ ] レスポンシブ対応
+
+#### 🔍 **初学者向け詳細説明**
+
+詳細ページは情報量が多いため、見やすいレイアウトが重要です。
+映画のポスター画像を大きく表示し、情報を整理して配置しましょう。
+
+### 15. テスト実行
+
+- [ ] `docker compose exec web bundle exec rspec spec/station08/` でテストを実行
+- [ ] すべてのテストが通ることを確認
+
+## 参考情報
+
+### 必要なファイル
+
+- `app/models/schedule.rb`（新規作成）
+- `app/models/movie.rb`（編集）
+- `app/controllers/movies_controller.rb`（編集）
+- `app/views/movies/show.html.erb`（新規作成）
+- `app/views/movies/index.html.erb`（編集）
+- `db/migrate/YYYYMMDD_create_schedules.rb`（新規作成）
+- `db/seeds.rb`（編集）
+- `config/routes.rb`（編集）
+
+### Schedule モデルの例
+
+```ruby
+class Schedule < ApplicationRecord
+  belongs_to :movie
+
+  validates :start_time, presence: true
+  validates :end_time, presence: true
+  validate :end_time_after_start_time
+
+  private
+
+  def end_time_after_start_time
+    return unless start_time && end_time
+
+    if end_time <= start_time
+      errors.add(:end_time, 'は開始時刻より後に設定してください')
+    end
+  end
+end
+```
+
+### Movie モデルの拡張例
+
+```ruby
+class Movie < ApplicationRecord
+  has_many :schedules, dependent: :destroy
+
+  # 既存のバリデーション...
+
+  def showing?
+    is_showing
+  end
+end
+```
+
+### MoviesController の拡張例
+
+```ruby
+class MoviesController < ApplicationController
+  def index
+    @movies = Movie.all
+    @movies = @movies.search_by_keyword(params[:keyword]) if params[:keyword].present?
+    @movies = @movies.filter_by_showing(params[:is_showing]) if params[:is_showing].present?
+  end
+
+  def show
+    @movie = Movie.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    flash[:alert] = '指定された映画が見つかりません。'
+    redirect_to movies_path
+  end
+end
+```
+
+### マイグレーションファイルの例
+
+```ruby
+class CreateSchedules < ActiveRecord::Migration[7.1]
+  def change
+    create_table :schedules do |t|
+      t.references :movie, null: false, foreign_key: true
+      t.time :start_time, null: false
+      t.time :end_time, null: false
+
+      t.timestamps
+    end
+
+    add_index :schedules, :movie_id
+  end
+end
+```
+
+### 詳細ページビューの例
+
+```erb
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= @movie.name %> - 映画詳細</title>
+  <style>
+    .movie-detail {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    .movie-poster {
+      max-width: 300px;
+      height: auto;
+    }
+    .schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    .schedule-table th,
+    .schedule-table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+    .schedule-table th {
+      background-color: #f8f9fa;
+    }
+  </style>
+</head>
+<body>
+  <div class="movie-detail">
+    <h1><%= @movie.name %></h1>
+
+    <div class="movie-info">
+      <% if @movie.image_url.present? %>
+        <img src="<%= @movie.image_url %>" alt="<%= @movie.name %>" class="movie-poster">
+      <% end %>
+
+      <p><strong>公開年:</strong> <%= @movie.year %></p>
+      <p><strong>概要:</strong> <%= @movie.description %></p>
+      <p><strong>上映状況:</strong> <%= @movie.is_showing? ? '上映中' : '上映予定' %></p>
+    </div>
+
+    <% if @movie.is_showing? %>
+      <h3>上映スケジュール</h3>
+      <% if @movie.schedules.any? %>
+        <table class="schedule-table">
+          <thead>
+            <tr>
+              <th>上映開始時刻</th>
+              <th>上映終了時刻</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @movie.schedules.each do |schedule| %>
+              <tr>
+                <td><%= schedule.start_time.strftime("%H:%M") %></td>
+                <td><%= schedule.end_time.strftime("%H:%M") %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p>上映スケジュールはまだ決まっていません。</p>
+      <% end %>
+    <% end %>
+
+    <p><%= link_to '映画一覧に戻る', movies_path %></p>
+  </div>
+</body>
+</html>
+```
+
+### シードデータの追加例
+
+```ruby
+# db/seeds.rb
+puts "上映スケジュールのテストデータを投入中..."
+
+# 上映中の映画にスケジュールを追加
+Movie.where(is_showing: true).each do |movie|
+  schedules_data = [
+    { start_time: '10:00', end_time: '12:00' },
+    { start_time: '14:00', end_time: '16:00' },
+    { start_time: '18:00', end_time: '20:00' }
+  ]
+
+  schedules_data.each do |schedule_data|
+    movie.schedules.find_or_create_by(schedule_data)
+  end
+end
+
+puts "上映スケジュールのテストデータ投入完了"
+```
+
+### テスト項目（station08）
+
+- GET /movies/:id が 200 ステータスで返される
+- HTML が返される（DOCTYPE html が含まれる）
+- 映画の全カラム情報が表示される
+- 画像が img タグで表示される
+- 上映中の映画の場合、上映スケジュールが表示される
+- 上映予定の映画の場合、スケジュールが表示されない
+- 映画一覧ページから詳細ページへのリンクが機能する
+- 存在しない映画 ID でアクセスした場合の適切なエラーハンドリング
+- Movies と Schedules のアソシエーションが正しく設定されている
+
+### 🎯 **初学者向け重要ポイント**
+
+1. **1 対 N の関係**: 1 つの映画に対して複数のスケジュールが存在する関係
+2. **外部キー**: 他のテーブルのレコードを参照するためのキー
+3. **アソシエーション**: モデル間の関係を表現する Rails の機能
+4. **TIME 型**: 時刻のみを格納するデータ型
+5. **条件分岐表示**: 上映状況に応じた表示の切り替え
+
+### 🚨 **注意事項**
+
+- 外部キー制約を適切に設定する
+- 終了時刻が開始時刻より後であることを検証する
+- 存在しない映画 ID でのアクセスに対するエラーハンドリング
+- 上映スケジュールがない場合の適切なメッセージ表示
+
+### 🔧 **発展課題（余裕があれば）**
+
+- 上映スケジュールの時刻表示を 12 時間制/24 時間制切り替え
+- 映画の上映時間（duration）カラムを追加
+- 上映スケジュールの並び順を時刻順にソート
+- 過去の上映スケジュールを表示しない機能
+- 映画詳細ページでの座席予約機能への導線

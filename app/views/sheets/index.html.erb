@@ -1,0 +1,22 @@
+<% content_for :title do%>
+座席表
+<% end %>
+
+<h1>座席表</h1>
+
+<table class = 'seat-map'>
+    <thead>
+        <th colspan = '5' class ='screen'>スクリーン</th>
+    </thead>
+    <tbody>
+        <% @seats_by_row.each do |row, seats| %>
+            <tr>
+                <td class = 'row-label'><%= row.upcase %></td>
+                    <% seats.sort_by(&:column).each do |seat| %>
+                        <td class ="seat"><%= seat.column %></td>
+                    <% end %>
+                </td>
+            </tr>
+        <% end %>
+    </tbody>
+</table>
