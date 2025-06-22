@@ -7,4 +7,15 @@ class Movie < ApplicationRecord
   validates :year, length: { maximum: 45 }, allow_blank: true
   validates :image_url, length: { maximum: 150 }, allow_blank: true
   validates :description, presence: false
+
+  # keywordで検索する機能を追加
+  scope :search_by_keyword, ->(keyword){
+    where("name LIKE ?", "%#{keyword}%")
+  }
+
+  # 年で検索する機能
+  scope :filter_by_showing, ->(is_showing){
+    where(is_showing: is_showing=='1')
+  }
+
 end

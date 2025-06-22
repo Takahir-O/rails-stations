@@ -13,3 +13,106 @@
  *= require_tree .
  *= require_self
  */
+
+/* 映画カードのコンテナ */
+.movies-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+/* 個別の映画カード */
+.movie-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: 400px;
+}
+
+.movie-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.movie-image {
+  width: 100%;
+  height: 60%;
+  overflow: hidden;
+  background-color: #f0f0f0;
+}
+
+.movie-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.movie-info {
+  padding: 15px;
+}
+
+.movie-title {
+  margin: 0 0 10px 0;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #333;
+}
+
+.movie-year {
+  margin: 5px 0;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.movie-description {
+  margin: 10px 0;
+  color: #555;
+  line-height: 1.4;
+  font-size: 0.9em;
+  flex: 1;
+}
+
+/* 検索フォーム */
+.search-form{
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.search-form input[type="text"]{
+  padding: 8px;
+  background-color: rgb(235, 235, 235);
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.search-form input[type="radio"]{
+  margin-right: 5px;
+}
+
+.search-form input[type="submit"]{
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+
+/* ラジオボタングループのスタイル設定 */
+.radio-group{
+  /* フレックスボックスレイアウトを使用 */
+  display: flex;
+  /* 子要素を縦方向に並べる */
+  flex-direction: column;
+  /* 子要素間の間隔を5pxに設定 */
+  gap: 5px;
+  /* 上下のマージンを15pxに設定 */
+  margin:15px 0;
+}

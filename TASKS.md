@@ -741,3 +741,339 @@ admin_movie      DELETE /admin/movies/:id           admin/movies#destroy
 - エラーハンドリングを忘れずに実装する
 - ユーザーにとって分かりやすいメッセージを心がける
 - テストは様々なパターンで行う（正常系、異常系両方）
+
+---
+
+# lesson-6
+
+## 課題概要
+
+映画一覧画面に検索機能と上映状況による絞り込み機能を実装する。ユーザーがキーワード検索や上映状況（すべて/公開予定/公開中）で映画を絞り込めるようにし、より使いやすい映画一覧画面を提供する。
+
+### 要件
+
+- GET /movies にクエリパラメータを渡すことで映画を絞り込み表示できる
+- 検索フォームとラジオボタン（すべて/公開予定/公開中）を設置する
+- キーワード検索：映画のタイトルまたは概要にキーワードを含む映画のみ表示
+- 上映状況絞り込み：is_showing の値に基づいて公開中/公開予定の映画のみ表示
+- 検索フォームとラジオボタンの組み合わせ検索が可能
+- デフォルトでは「すべて」が選択された状態で全映画を表示
+
+### クエリパラメータの仕様
+
+- `keyword=xxx`: タイトルまたは概要に"xxx"を含む映画のみ表示
+- `is_showing=1`: 公開中の映画のみ表示（is_showing = true）
+- `is_showing=0`: 公開予定の映画のみ表示（is_showing = false）
+- パラメータなし: 全映画を表示
+
+## 実装手順
+
+### 1. MoviesController の index アクション拡張
+
+- [ ] `app/controllers/movies_controller.rb` を編集
+- [ ] index アクションに検索・絞り込み機能を追加
+  - [ ] `params[:keyword]` でキーワード検索を処理
+  - [ ] `params[:is_showing]` で上映状況絞り込みを処理
+  - [ ] 複数条件の組み合わせ検索に対応
+- [ ] Movie モデルにスコープメソッドを定義して検索処理を分離
+
+#### 🔍 **初学者向け詳細説明**
+
+クエリパラメータとは URL の `?` 以降に付く検索条件です。
+例：`/movies?keyword=アクション&is_showing=1`
+
+### 2. Movie モデルにスコープの追加
+
+- [ ] `app/models/movie.rb` を編集
+- [ ] キーワード検索用のスコープを追加
+  - [ ] `scope :search_by_keyword, ->(keyword) { ... }`
+  - [ ] タイトル（name）と概要（description）を LIKE 検索
+- [ ] 上映状況絞り込み用のスコープを追加
+  - [ ] `scope :filter_by_showing, ->(is_showing) { ... }`
+  - [ ] is_showing カラムでの絞り込み
+
+#### 🔍 **初学者向け詳細説明**
+
+スコープとは、よく使う検索条件を再利用可能な形でモデルに定義する機能です。
+コントローラーが複雑になるのを防ぎ、テストもしやすくなります。
+
+### 3. index ビューファイルの拡張
+
+- [ ] `app/views/movies/index.html.erb` を編集
+- [ ] 検索フォームを追加
+  - [ ] `form_with` を使用して GET メソッドのフォームを作成
+  - [ ] キーワード入力フィールド（text_field）
+  - [ ] 上映状況選択ラジオボタン（radio_button）
+  - [ ] 検索ボタン（submit）
+- [ ] フォームの初期値設定
+  - [ ] キーワードフィールドに現在の検索キーワードを表示
+  - [ ] ラジオボタンに現在の選択状態を反映
+
+#### 🔍 **初学者向け詳細説明**
+
+検索フォームは GET メソッドを使用します。これにより、検索結果の URL を共有したり、ブラウザの戻るボタンが正しく動作します。
+
+### 4. 検索フォームの詳細実装
+
+- [ ] キーワード検索フィールドの実装
+  - [ ] `text_field_tag :keyword, params[:keyword]` でキーワード入力
+  - [ ] プレースホルダーテキストを設定
+- [ ] ラジオボタンの実装
+  - [ ] 「すべて」: `radio_button_tag :is_showing, '', checked: params[:is_showing].blank?`
+  - [ ] 「公開中」: `radio_button_tag :is_showing, '1', checked: params[:is_showing] == '1'`
+  - [ ] 「公開予定」: `radio_button_tag :is_showing, '0', checked: params[:is_showing] == '0'`
+- [ ] 各ラジオボタンにラベルを設定
+
+#### 🔍 **初学者向け詳細説明**
+
+- `text_field_tag`: フォームのテキスト入力フィールドを作成
+- `radio_button_tag`: ラジオボタンを作成
+- `checked:` オプション: 現在の選択状態を維持するために使用
+
+### 5. コントローラーでの検索処理実装
+
+- [ ] MoviesController の index アクションを以下のように実装
+
+```ruby
+def index
+  @movies = Movie.all
+  @movies = @movies.search_by_keyword(params[:keyword]) if params[:keyword].present?
+  @movies = @movies.filter_by_showing(params[:is_showing]) if params[:is_showing].present?
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `present?`: 値が存在し、空でないかをチェック
+- メソッドチェーン: 複数の条件を順次適用していく書き方
+
+### 6. Movie モデルのスコープ実装
+
+- [ ] キーワード検索スコープの実装
+
+```ruby
+scope :search_by_keyword, ->(keyword) {
+  where("name LIKE ? OR description LIKE ?", "%#{keyword}%", "%#{keyword}%")
+}
+```
+
+- [ ] 上映状況絞り込みスコープの実装
+
+```ruby
+scope :filter_by_showing, ->(is_showing) {
+  where(is_showing: is_showing == '1')
+}
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `LIKE ?`: SQL の部分一致検索（`%` は任意の文字列を表す）
+- `where`: データベースから条件に合うレコードのみを取得
+
+### 7. フォームのスタイリング
+
+- [ ] 検索フォームを見やすくレイアウト
+- [ ] CSS クラスを追加してスタイリング
+- [ ] フォーム要素を適切に配置
+  - [ ] キーワード入力フィールドとラジオボタンを横並びまたは縦並びに配置
+  - [ ] 検索ボタンを分かりやすい位置に配置
+
+#### 🔍 **初学者向け詳細説明**
+
+ユーザビリティを向上させるため、フォームは見た目も重要です。
+使いやすいレイアウトを心がけましょう。
+
+### 8. 検索結果の表示改善
+
+- [ ] 検索結果件数の表示
+- [ ] 検索条件の表示（現在の絞り込み状態を表示）
+- [ ] 検索結果が 0 件の場合のメッセージ表示
+- [ ] 「検索条件をクリア」リンクの追加
+
+#### 🔍 **初学者向け詳細説明**
+
+ユーザーが現在どのような条件で検索しているかを明確に示すことで、
+使いやすさが向上します。
+
+### 9. エラーハンドリング
+
+- [ ] 不正なパラメータが渡された場合の処理
+- [ ] データベースエラーの処理
+- [ ] 検索処理でのパフォーマンス考慮
+
+#### 🔍 **初学者向け詳細説明**
+
+検索機能では大量のデータを扱う可能性があるため、
+適切なエラーハンドリングとパフォーマンス対策が重要です。
+
+### 10. 動作確認
+
+- [ ] サーバーを起動（`bundle exec rails server`）
+- [ ] `http://localhost:3000/movies` にアクセス
+- [ ] 検索フォームが表示されることを確認
+- [ ] デフォルトで「すべて」が選択され、全映画が表示されることを確認
+- [ ] キーワード検索の動作確認
+  - [ ] 映画タイトルの一部で検索
+  - [ ] 概要の一部で検索
+  - [ ] 存在しないキーワードで検索（0 件表示の確認）
+- [ ] 上映状況絞り込みの動作確認
+  - [ ] 「公開中」を選択して検索
+  - [ ] 「公開予定」を選択して検索
+- [ ] 組み合わせ検索の動作確認
+  - [ ] キーワード + 上映状況での絞り込み
+
+### 11. URL とクエリパラメータの確認
+
+- [ ] 検索後の URL にクエリパラメータが正しく含まれることを確認
+- [ ] ブラウザの戻るボタンで検索状態が保持されることを確認
+- [ ] URL を直接入力して検索条件が反映されることを確認
+  - [ ] `/movies?keyword=アクション`
+  - [ ] `/movies?is_showing=1`
+  - [ ] `/movies?keyword=コメディ&is_showing=0`
+
+### 12. テスト実行
+
+- [ ] `bundle exec rspec spec/station06/` でテストを実行
+- [ ] すべてのテストが通ることを確認
+
+## 参考情報
+
+### 必要なファイル
+
+- `app/controllers/movies_controller.rb`（編集）
+- `app/models/movie.rb`（編集）
+- `app/views/movies/index.html.erb`（編集）
+
+### MoviesController の例
+
+```ruby
+class MoviesController < ApplicationController
+  def index
+    @movies = Movie.all
+    @movies = @movies.search_by_keyword(params[:keyword]) if params[:keyword].present?
+    @movies = @movies.filter_by_showing(params[:is_showing]) if params[:is_showing].present?
+  end
+end
+```
+
+### Movie モデルのスコープ例
+
+```ruby
+class Movie < ApplicationRecord
+  scope :search_by_keyword, ->(keyword) {
+    where("name LIKE ? OR description LIKE ?", "%#{keyword}%", "%#{keyword}%")
+  }
+
+  scope :filter_by_showing, ->(is_showing) {
+    where(is_showing: is_showing == '1')
+  }
+end
+```
+
+### 検索フォームの例
+
+```erb
+<%= form_with url: movies_path, method: :get, local: true do |f| %>
+  <div>
+    <%= text_field_tag :keyword, params[:keyword], placeholder: "映画タイトルまたは概要で検索" %>
+  </div>
+
+  <div>
+    <%= radio_button_tag :is_showing, '', checked: params[:is_showing].blank? %>
+    <%= label_tag :is_showing_, "すべて" %>
+
+    <%= radio_button_tag :is_showing, '1', checked: params[:is_showing] == '1' %>
+    <%= label_tag :is_showing_1, "公開中" %>
+
+    <%= radio_button_tag :is_showing, '0', checked: params[:is_showing] == '0' %>
+    <%= label_tag :is_showing_0, "公開予定" %>
+  </div>
+
+  <div>
+    <%= submit_tag "検索" %>
+  </div>
+<% end %>
+```
+
+### 検索結果の表示例
+
+```erb
+<% if params[:keyword].present? || params[:is_showing].present? %>
+  <div class="search-info">
+    <h3>検索結果: <%= @movies.count %>件</h3>
+    <% if params[:keyword].present? %>
+      <p>キーワード: "<%= params[:keyword] %>"</p>
+    <% end %>
+    <% if params[:is_showing].present? %>
+      <p>上映状況: <%= params[:is_showing] == '1' ? '公開中' : '公開予定' %></p>
+    <% end %>
+    <%= link_to "検索条件をクリア", movies_path %>
+  </div>
+<% end %>
+```
+
+### CSS スタイルの例
+
+```css
+.search-form {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.search-form input[type="text"] {
+  padding: 8px;
+  margin-right: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.search-form input[type="radio"] {
+  margin-right: 5px;
+  margin-left: 15px;
+}
+
+.search-form input[type="submit"] {
+  background-color: #007bff;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+```
+
+### テスト項目（station06）
+
+- GET /movies でデフォルト状態（全映画表示）が正しく動作する
+- キーワード検索が正しく動作する（タイトル・概要の部分一致）
+- 上映状況絞り込みが正しく動作する（公開中・公開予定）
+- キーワードと上映状況の組み合わせ検索が正しく動作する
+- 検索フォームの初期値が正しく設定される
+- 検索結果が 0 件の場合も適切に表示される
+- クエリパラメータが URL に正しく反映される
+- 不正なパラメータでもエラーにならない
+
+### 🎯 **初学者向け重要ポイント**
+
+1. **スコープ**: モデルに検索ロジックを分離することで、コントローラーがシンプルになる
+2. **クエリパラメータ**: GET リクエストで検索条件を URL に含める仕組み
+3. **LIKE 検索**: データベースでの部分一致検索の方法
+4. **フォームの状態保持**: 検索後もフォームの入力値を保持する重要性
+5. **ユーザビリティ**: 検索結果の件数表示や条件クリア機能の価値
+
+### 🚨 **注意事項**
+
+- 検索機能はパフォーマンスに影響するため、大量データでの動作も考慮する
+- SQL インジェクション対策として、必ず Rails のクエリメソッドを使用する
+- ユーザーの入力値は適切にサニタイズする
+- 検索結果が 0 件の場合のユーザー体験も考慮する
+
+### 🔧 **発展課題（余裕があれば）**
+
+- ページネーション機能の追加（kaminari gem など）
+- 検索履歴の保存機能
+- オートコンプリート機能
+- ソート機能（公開年順、タイトル順など）
+- お気に入り機能との連携
