@@ -10,7 +10,7 @@ class Movie < ApplicationRecord
 
   # keywordで検索する機能を追加
   scope :search_by_keyword, ->(keyword){
-    where("name LIKE ?", "%#{keyword}%")
+    where("name LIKE ? OR description LIKE ?", "%#{keyword}%", "%#{keyword}%")
   }
 
   # 年で検索する機能
