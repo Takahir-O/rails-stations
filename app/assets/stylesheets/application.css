@@ -22,6 +22,10 @@
   padding: 20px;
 }
 
+.movie-card-link{
+  text-decoration:none;
+}
+
 /* 個別の映画カード */
 .movie-card {
   background-color: #fff;

@@ -47,3 +47,30 @@ end
 puts "シードデータの作成が完了しました"
 puts "映画: #{Movie.count}件"
 puts "座席: #{Sheet.count}件"
+
+
+# 上映中の映画
+puts "上映中のスケジュールのテストデータを投入中"
+
+# 上映中の映画にスケジュールを追加
+Movie.where(is_showing: true).each do |movie|
+  # 今日から1週間分のスケジュールを作成
+  (0..6).each do |day_offset|
+    date = Date.current + day_offset.days
+
+    schedule_data = [
+      {start_time: date.beginning_of_day + 10.hours,end_time: date.beginning_of_day + 12.hours},
+      {start_time: date.beginning_of_day + 13.hours,end_time: date.beginning_of_day + 15.hours},
+      {start_time: date.beginning_of_day + 16.hours,end_time: date.beginning_of_day + 18.hours},
+      {start_time: date.beginning_of_day + 19.hours,end_time: date.beginning_of_day + 21.hours},
+      {start_time: date.beginning_of_day + 22.hours,end_time: date.beginning_of_day + 24.hours}
+    ]
+
+    schedule_data.each do |schedule|
+      movie.schedules.find_or_create_by(schedule)
+    end
+  end
+end
+
+puts "上映中のスケジュールのテストデータの投入が完了しました"
+puts "スケジュール: #{Schedule.count}件"

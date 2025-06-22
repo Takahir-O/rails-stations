@@ -8,6 +8,9 @@ class Movie < ApplicationRecord
   validates :image_url, length: { maximum: 150 }, allow_blank: true
   validates :description, presence: false
 
+  # 関連モデルの設定
+  has_many :schedules, dependent: :destroy
+
   # keywordで検索する機能を追加
   scope :search_by_keyword, ->(keyword){
     where("name LIKE ? OR description LIKE ?", "%#{keyword}%", "%#{keyword}%")
@@ -17,5 +20,9 @@ class Movie < ApplicationRecord
   scope :filter_by_showing, ->(is_showing){
     where(is_showing: is_showing=='1')
   }
+
+  def showing?
+    is_showing
+  end
 
 end

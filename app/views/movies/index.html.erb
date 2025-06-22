@@ -23,15 +23,19 @@
 <% end %>
 <div class = "movies-container">
   <% @movies.each do |movie| %>
-    <div class = "movie-card">
-      <div class = "movie-image">
-        <%= image_tag movie.image_url, alt: movie.name %>
+    <%= link_to movie_path(movie), class: "movie-card-link" do %>
+      <div class = "movie-card">
+        <div class = "movie-image">
+          <%= image_tag movie.image_url, alt: movie.name %>
+        </div>
+        <div class = "movie-info">
+          <h3 class = "movie-title">
+            <%= movie.name %>
+          </h3>
+          <p class = "movie-year">公開年：<%= movie.year %></p>
+          <p class = "movie-description"><%= movie.description %></p>
+        </div>
       </div>
-      <div class = "movie-info">
-        <h3 class = "movie-title"><%= movie.name %></h3>
-        <p class = "movie-year">公開年：<%= movie.year %></p>
-        <p class = "movie-description"><%= movie.description %></p>
-      </div>
-    </div>
+    <% end %>
   <% end %>
-</div>
+  </div>

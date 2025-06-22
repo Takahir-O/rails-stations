@@ -1,5 +1,5 @@
 Rails.application.routes.draw do
-  get "movies", to: "movies#index"
+  resources :movies, only: [:index,:show]
   get "sheets", to: "sheets#index"
   
   namespace :admin do

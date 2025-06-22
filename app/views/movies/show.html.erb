@@ -1,0 +1,36 @@
+<% content_for :title, "#{@movie.name} - 映画詳細"%>
+<div class = "movie-detail">
+  <h1><%= @movie.name %></h1>
+  <div class ="movie-info">
+    <% if @movie.image_url.present? %>
+      <img src = "<%= @movie.image_url %>" alt= "<%= @movie.name %>" class = "movie-poster">
+    <% end %>
+    <p><strong>公開年:</strong><%= @movie.year %></p>
+    <p><strong>概要:</strong><%= @movie.description %></p>
+    <p><strong>上映状況:</strong><%= @movie.showing? ? "上映中" : "上映予定" %></p>
+  </div>
+
+  <% if @movie.is_showing?%>
+    <h3>上映スケジュール</h3>
+    <% if @movie.schedules.any? %>
+        <table class="schedule-table">
+            <thead>
+                <tr>
+                    <th>上映開始時刻</th>
+                    <th>上映終了時刻</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% @movie.schedules.each do |schedule| %>
+                    <tr>
+                        <td><%= schedule.start_time.strftime("%Y-%m-%d %H:%M") %></td>
+                        <td><%= schedule.end_time.strftime("%Y-%m-%d %H:%M") %></td>
+                    </tr>
+                <% end %>
+            </tbody>
+        </table>
+    <% else %>
+        <p>上映スケジュールはありません</p>
+    <% end %>
+  <% end %>
+</div>
