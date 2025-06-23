@@ -1435,51 +1435,46 @@ end
 ### ビューファイルの例
 
 ```erb
-<!DOCTYPE html>
-<html>
-<head>
-  <title>座席表</title>
-  <style>
-    .seat-map {
-      margin: 20px auto;
-      border-collapse: collapse;
-    }
-    .seat-map th, .seat-map td {
-      border: 1px solid #ddd;
-      padding: 15px;
-      text-align: center;
-    }
-    .screen {
-      background-color: #333;
-      color: white;
-      font-weight: bold;
-    }
-    .seat {
-      background-color: #f8f9fa;
-    }
-  </style>
-</head>
-<body>
-  <h1>座席表</h1>
+<% content_for :title, "座席表" %>
 
-  <table class="seat-map">
-    <thead>
+<style>
+  .seat-map {
+    margin: 20px auto;
+    border-collapse: collapse;
+  }
+  .seat-map th, .seat-map td {
+    border: 1px solid #ddd;
+    padding: 15px;
+    text-align: center;
+  }
+  .screen {
+    background-color: #333;
+    color: white;
+    font-weight: bold;
+  }
+  .seat {
+    background-color: #f8f9fa;
+  }
+</style>
+
+<h1>座席表</h1>
+
+<table class="seat-map">
+  <thead>
+    <tr>
+      <th colspan="5" class="screen">スクリーン</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @seats_by_row.each do |row, seats| %>
       <tr>
-        <th colspan="5" class="screen">スクリーン</th>
+        <% seats.sort_by(&:column).each do |seat| %>
+          <td class="seat"><%= seat.seat_number %></td>
+        <% end %>
       </tr>
-    </thead>
-    <tbody>
-      <% @seats_by_row.each do |row, seats| %>
-        <tr>
-          <% seats.sort_by(&:column).each do |seat| %>
-            <td class="seat"><%= seat.seat_number %></td>
-          <% end %>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-</body>
-</html>
+    <% end %>
+  </tbody>
+</table>
 ```
 
 ### シードデータの例
@@ -1883,78 +1878,73 @@ end
 ### 詳細ページビューの例
 
 ```erb
-<!DOCTYPE html>
-<html>
-<head>
-  <title><%= @movie.name %> - 映画詳細</title>
-  <style>
-    .movie-detail {
-      max-width: 800px;
-      margin: 20px auto;
-      padding: 20px;
-    }
-    .movie-poster {
-      max-width: 300px;
-      height: auto;
-    }
-    .schedule-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    .schedule-table th,
-    .schedule-table td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: center;
-    }
-    .schedule-table th {
-      background-color: #f8f9fa;
-    }
-  </style>
-</head>
-<body>
-  <div class="movie-detail">
-    <h1><%= @movie.name %></h1>
+<% content_for :title, "#{@movie.name} - 映画詳細" %>
 
-    <div class="movie-info">
-      <% if @movie.image_url.present? %>
-        <img src="<%= @movie.image_url %>" alt="<%= @movie.name %>" class="movie-poster">
-      <% end %>
+<style>
+  .movie-detail {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+  }
+  .movie-poster {
+    max-width: 300px;
+    height: auto;
+  }
+  .schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  .schedule-table th,
+  .schedule-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+  }
+  .schedule-table th {
+    background-color: #f8f9fa;
+  }
+</style>
 
-      <p><strong>公開年:</strong> <%= @movie.year %></p>
-      <p><strong>概要:</strong> <%= @movie.description %></p>
-      <p><strong>上映状況:</strong> <%= @movie.is_showing? ? '上映中' : '上映予定' %></p>
-    </div>
+<div class="movie-detail">
+  <h1><%= @movie.name %></h1>
 
-    <% if @movie.is_showing? %>
-      <h3>上映スケジュール</h3>
-      <% if @movie.schedules.any? %>
-        <table class="schedule-table">
-          <thead>
-            <tr>
-              <th>上映開始時刻</th>
-              <th>上映終了時刻</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @movie.schedules.each do |schedule| %>
-              <tr>
-                <td><%= schedule.start_time.strftime("%H:%M") %></td>
-                <td><%= schedule.end_time.strftime("%H:%M") %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      <% else %>
-        <p>上映スケジュールはまだ決まっていません。</p>
-      <% end %>
+  <div class="movie-info">
+    <% if @movie.image_url.present? %>
+      <img src="<%= @movie.image_url %>" alt="<%= @movie.name %>" class="movie-poster">
     <% end %>
 
-    <p><%= link_to '映画一覧に戻る', movies_path %></p>
+    <p><strong>公開年:</strong> <%= @movie.year %></p>
+    <p><strong>概要:</strong> <%= @movie.description %></p>
+    <p><strong>上映状況:</strong> <%= @movie.is_showing? ? '上映中' : '上映予定' %></p>
   </div>
-</body>
-</html>
+
+  <% if @movie.is_showing? %>
+    <h3>上映スケジュール</h3>
+    <% if @movie.schedules.any? %>
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th>上映開始時刻</th>
+            <th>上映終了時刻</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @movie.schedules.each do |schedule| %>
+            <tr>
+              <td><%= schedule.start_time.strftime("%H:%M") %></td>
+              <td><%= schedule.end_time.strftime("%H:%M") %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p>上映スケジュールはまだ決まっていません。</p>
+    <% end %>
+  <% end %>
+
+  <p><%= link_to '映画一覧に戻る', movies_path %></p>
+</div>
 ```
 
 ### シードデータの追加例
@@ -2013,3 +2003,468 @@ puts "上映スケジュールのテストデータ投入完了"
 - 上映スケジュールの並び順を時刻順にソート
 - 過去の上映スケジュールを表示しない機能
 - 映画詳細ページでの座席予約機能への導線
+
+---
+
+# lesson-9
+
+## 課題概要
+
+管理画面から上映スケジュールの一覧、追加、編集、削除を行える機能を実装する。映画作品と同様の CRUD 機能を提供するが、スケジュールは映画作品に紐づくため、映画作品の管理画面から遷移する形で実装する。
+
+### 要件
+
+- GET /admin/schedules でスケジュール一覧を表示する
+  - 作品 ID・作品名を見出し（h2 タグ）にし、その下にその作品の開始時刻・終了時刻をリストアップ
+  - スケジュールが設定されていない作品は表示しない
+  - schedules の全件・全カラムを表示する
+  - 各スケジュールはリンクになっていて、リンク先は GET /admin/schedules/:id
+- GET /admin/movies/:id にリンクを追加
+  - その作品に対応する GET /admin/schedules/:id へのリンクを置く
+  - GET /admin/movies/:id/schedules/new へのリンクを追加する
+- GET /admin/schedules/:id でスケジュール編集フォームを表示
+  - 開始時刻と終了時刻のフォーム
+  - movie_id は変更不可（必要なら削除して新規追加）
+  - 削除ボタンあり（確認ダイアログ付き）
+- PUT /admin/schedules/:id で更新処理
+- DELETE /admin/schedules/:id で削除処理（物理削除）
+
+### 画面上の表記とカラム名の対応
+
+- movie_id: 作品 ID
+- start_time: 開始時刻
+- end_time: 終了時刻
+- created_at: 作成日時
+- updated_at: 更新日時
+
+## 実装手順
+
+### 1. ルーティングの設定
+
+- [ ] `config/routes.rb` を編集
+- [ ] admin 名前空間に schedules リソースを追加
+- [ ] movies リソースの member 内に schedules#new を追加
+
+```ruby
+namespace :admin do
+  resources :movies, only: [:index, :new, :create, :edit, :update, :destroy] do
+    member do
+      get 'schedules/new', to: 'schedules#new'
+    end
+  end
+  resources :schedules, only: [:index, :edit, :update, :destroy]
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+`member do`ブロックを使用することで、特定の映画に対するスケジュール新規作成画面へのルーティングを設定できます。
+これにより`/admin/movies/:id/schedules/new`という URL が使用可能になります。
+
+### 2. Admin::SchedulesController の作成
+
+- [ ] `app/controllers/admin/schedules_controller.rb` ファイルを作成
+- [ ] ApplicationController を継承した Admin::SchedulesController クラスを定義
+- [ ] 各アクションを実装
+
+```ruby
+class Admin::SchedulesController < ApplicationController
+  before_action :set_schedule, only: [:edit, :update, :destroy]
+
+  def index
+    @movies_with_schedules = Movie.joins(:schedules).distinct.includes(:schedules)
+  end
+
+  def new
+    @movie = Movie.find(params[:id])
+    @schedule = @movie.schedules.build
+  rescue ActiveRecord::RecordNotFound
+    flash[:alert] = '指定された映画が見つかりません。'
+    redirect_to admin_movies_path
+  end
+
+  def create
+    @movie = Movie.find(params[:movie_id])
+    @schedule = @movie.schedules.build(schedule_params)
+
+    if @schedule.save
+      flash[:notice] = 'スケジュールが正常に作成されました。'
+      redirect_to edit_admin_movie_path(@movie)
+    else
+      flash[:alert] = 'スケジュールの作成に失敗しました。'
+      render :new, status: :bad_request
+    end
+  rescue ActiveRecord::RecordNotFound
+    flash[:alert] = '指定された映画が見つかりません。'
+    redirect_to admin_movies_path
+  end
+
+  def edit
+    @movie = @schedule.movie
+  end
+
+  def update
+    if @schedule.update(schedule_params)
+      flash[:notice] = 'スケジュールが正常に更新されました。'
+      redirect_to admin_schedules_path
+    else
+      flash[:alert] = 'スケジュールの更新に失敗しました。'
+      render :edit, status: :bad_request
+    end
+  end
+
+  def destroy
+    movie = @schedule.movie
+    @schedule.destroy
+    flash[:notice] = 'スケジュールが正常に削除されました。'
+    redirect_to edit_admin_movie_path(movie)
+  rescue => e
+    flash[:alert] = 'スケジュールの削除に失敗しました。'
+    redirect_to admin_schedules_path
+  end
+
+  private
+
+  def set_schedule
+    @schedule = Schedule.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    flash[:alert] = '指定されたスケジュールが見つかりません。'
+    redirect_to admin_schedules_path
+  end
+
+  def schedule_params
+    params.require(:schedule).permit(:start_time, :end_time)
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `before_action`: 特定のアクションの前に実行されるメソッドを指定
+- `joins(:schedules)`: スケジュールを持つ映画のみを取得
+- `distinct`: 重複を除去
+- `includes(:schedules)`: N+1 問題を防ぐため関連データを事前読み込み
+
+### 3. スケジュール一覧ビューの作成
+
+- [ ] `app/views/admin/schedules` ディレクトリを作成
+- [ ] `app/views/admin/schedules/index.html.erb` ファイルを作成
+- [ ] 映画ごとにスケジュールを表示
+
+```erb
+<% content_for :title, "スケジュール管理" %>
+
+<style>
+  .schedule-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
+  .schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  .schedule-table th,
+  .schedule-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  .schedule-table th {
+    background-color: #f8f9fa;
+  }
+</style>
+
+<h1>スケジュール一覧</h1>
+
+<% @movies_with_schedules.each do |movie| %>
+  <div class="schedule-section">
+    <h2>作品ID: <%= movie.id %> - <%= movie.name %></h2>
+
+    <table class="schedule-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>開始時刻</th>
+          <th>終了時刻</th>
+          <th>作成日時</th>
+          <th>更新日時</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% movie.schedules.order(:start_time).each do |schedule| %>
+          <tr>
+            <td><%= link_to schedule.id, edit_admin_schedule_path(schedule) %></td>
+            <td><%= schedule.start_time.strftime("%H:%M") %></td>
+            <td><%= schedule.end_time.strftime("%H:%M") %></td>
+            <td><%= schedule.created_at.strftime("%Y-%m-%d %H:%M") %></td>
+            <td><%= schedule.updated_at.strftime("%Y-%m-%d %H:%M") %></td>
+            <td><%= link_to "編集", edit_admin_schedule_path(schedule) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<p><%= link_to "映画管理に戻る", admin_movies_path %></p>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- 映画ごとにセクションを分けて表示
+- h2 タグで作品 ID・作品名を表示
+- 各スケジュールの ID をリンクにして編集画面へ遷移可能に
+
+### 4. 映画編集画面へのリンク追加
+
+- [ ] `app/views/admin/movies/edit.html.erb` を編集
+- [ ] スケジュール関連のリンクを追加
+
+```erb
+<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ccc;">
+  <h3>スケジュール管理</h3>
+
+  <% if @movie.schedules.any? %>
+    <h4>現在のスケジュール</h4>
+    <ul>
+      <% @movie.schedules.order(:start_time).each do |schedule| %>
+        <li>
+          <%= schedule.start_time.strftime("%H:%M") %> - <%= schedule.end_time.strftime("%H:%M") %>
+          <%= link_to "編集", edit_admin_schedule_path(schedule) %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p>スケジュールが設定されていません。</p>
+  <% end %>
+
+  <p><%= link_to "新規スケジュール追加", admin_movie_schedules_new_path(@movie), style: "background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;" %></p>
+</div>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+映画編集画面に、その映画に紐づくスケジュールの一覧と新規追加リンクを表示します。
+これにより、映画管理とスケジュール管理がスムーズに連携します。
+
+### 5. スケジュール新規作成ビューの作成
+
+- [ ] `app/views/admin/schedules/new.html.erb` ファイルを作成
+- [ ] 新規作成フォームを実装
+
+```erb
+<% content_for :title, "スケジュール新規作成" %>
+
+<h1>スケジュール新規作成</h1>
+<h2>映画: <%= @movie.name %></h2>
+
+<% if @schedule.errors.any? %>
+  <div style="color: red;">
+    <ul>
+      <% @schedule.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<%= form_with model: [:admin, @schedule], url: admin_schedules_path, local: true do |f| %>
+  <%= hidden_field_tag :movie_id, @movie.id %>
+
+  <div class="field">
+    <%= f.label :start_time, "開始時刻" %>
+    <%= f.time_field :start_time, required: true %>
+  </div>
+
+  <div class="field">
+    <%= f.label :end_time, "終了時刻" %>
+    <%= f.time_field :end_time, required: true %>
+  </div>
+
+  <div class="actions">
+    <%= f.submit "作成" %>
+  </div>
+<% end %>
+
+<p><%= link_to "映画編集画面に戻る", edit_admin_movie_path(@movie) %></p>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `hidden_field_tag`: 画面に表示されないフィールドで映画 ID を送信
+- `time_field`: HTML5 の時刻入力フィールド
+- フォームの送信先は`admin_schedules_path`（POST）
+
+### 6. スケジュール編集ビューの作成
+
+- [ ] `app/views/admin/schedules/edit.html.erb` ファイルを作成
+- [ ] 編集フォームと削除ボタンを実装
+
+```erb
+<% content_for :title, "スケジュール編集" %>
+
+<h1>スケジュール編集</h1>
+<h2>映画: <%= @movie.name %></h2>
+
+<% if @schedule.errors.any? %>
+  <div style="color: red;">
+    <ul>
+      <% @schedule.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<%= form_with model: [:admin, @schedule], local: true do |f| %>
+  <div class="field">
+    <%= f.label :start_time, "開始時刻" %>
+    <%= f.time_field :start_time, required: true %>
+  </div>
+
+  <div class="field">
+    <%= f.label :end_time, "終了時刻" %>
+    <%= f.time_field :end_time, required: true %>
+  </div>
+
+  <p><small>※作品IDは変更できません。別の映画のスケジュールにしたい場合は、このスケジュールを削除して新規作成してください。</small></p>
+
+  <div class="actions">
+    <%= f.submit "更新" %>
+  </div>
+<% end %>
+
+<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ccc;">
+  <%= link_to "削除",
+              admin_schedule_path(@schedule),
+              method: :delete,
+              data: { confirm: "このスケジュールを削除しますか？削除すると元に戻せません。" },
+              style: "background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;" %>
+</div>
+
+<p><%= link_to "スケジュール一覧に戻る", admin_schedules_path %></p>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- movie_id は変更不可のため、フォームには含めない
+- 削除ボタンには確認ダイアログを設定
+- 削除後は映画編集画面に戻るよう設計
+
+### 7. ルーティングの追加修正
+
+- [ ] `config/routes.rb` を再編集
+- [ ] schedules#create アクションを追加
+
+```ruby
+namespace :admin do
+  resources :movies, only: [:index, :new, :create, :edit, :update, :destroy] do
+    member do
+      get 'schedules/new', to: 'schedules#new'
+    end
+  end
+  resources :schedules, only: [:index, :create, :edit, :update, :destroy]
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+create アクションを追加することで、新規作成フォームからの POST リクエストを処理できるようになります。
+
+### 8. エラーハンドリングの強化
+
+- [ ] Schedule モデルのバリデーションを確認
+- [ ] コントローラーの例外処理を追加
+- [ ] 適切なエラーメッセージを設定
+
+#### 🔍 **初学者向け詳細説明**
+
+データの整合性を保つため、Schedule モデルには以下のバリデーションが設定されているはずです：
+
+- 開始時刻と終了時刻の必須チェック
+- 終了時刻が開始時刻より後であることのチェック
+
+### 9. 動作確認
+
+- [ ] サーバーを起動（`bundle exec rails server`）
+- [ ] `http://localhost:3000/admin/movies` にアクセス
+- [ ] 映画編集画面でスケジュール関連のリンクが表示されることを確認
+- [ ] 新規スケジュール作成が正常に動作することを確認
+- [ ] `http://localhost:3000/admin/schedules` でスケジュール一覧が表示されることを確認
+- [ ] スケジュールの編集・更新が正常に動作することを確認
+- [ ] スケジュールの削除が正常に動作することを確認（確認ダイアログも確認）
+
+#### 🔍 **初学者向け詳細説明**
+
+動作確認では以下の点を重点的にチェックします：
+
+- 映画とスケジュールの関連が正しく保たれているか
+- エラー時のメッセージが適切に表示されるか
+- 削除時の確認ダイアログが機能しているか
+
+### 10. スタイリングの追加
+
+- [ ] 各ビューに CSS を追加
+- [ ] フォームのレイアウト調整
+- [ ] エラーメッセージの見た目を改善
+- [ ] レスポンシブ対応
+
+#### 🔍 **初学者向け詳細説明**
+
+管理画面として統一感のあるデザインを心がけ、操作しやすい UI を実装します。
+
+### 11. テスト実行
+
+- [ ] `bundle exec rspec spec/station09/` でテストを実行
+- [ ] すべてのテストが通ることを確認
+
+## 参考情報
+
+### 必要なファイル
+
+- `app/controllers/admin/schedules_controller.rb`（新規作成）
+- `app/views/admin/schedules/index.html.erb`（新規作成）
+- `app/views/admin/schedules/new.html.erb`（新規作成）
+- `app/views/admin/schedules/edit.html.erb`（新規作成）
+- `app/views/admin/movies/edit.html.erb`（編集）
+- `config/routes.rb`（編集）
+
+### テスト項目（station09）
+
+- GET /admin/schedules が 200 ステータスで返される
+- スケジュール一覧が映画ごとにグループ化されて表示される
+- 各スケジュールの ID がリンクとして機能する
+- GET /admin/movies/:id にスケジュール関連のリンクが表示される
+- GET /admin/movies/:id/schedules/new で新規作成フォームが表示される
+- POST /admin/schedules で正常に作成できる
+- GET /admin/schedules/:id で編集フォームが表示される
+- PUT /admin/schedules/:id で正常に更新できる
+- DELETE /admin/schedules/:id で正常に削除できる
+- エラー時に適切な flash メッセージが表示される
+
+### 🎯 **初学者向け重要ポイント**
+
+1. **ネストしたルーティング**: 映画に紐づくスケジュールの新規作成 URL を実現
+2. **joins と includes**: 効率的なデータ取得と N+1 問題の回避
+3. **before_action**: 共通処理を DRY に実装
+4. **hidden_field**: フォームで見えない値を送信する方法
+5. **data-confirm**: 削除時の確認ダイアログ実装
+
+### 🚨 **注意事項**
+
+- movie_id は編集画面で変更不可にする
+- スケジュールが存在しない映画は一覧に表示しない
+- 削除は物理削除で実装
+- エラーハンドリングを適切に実装する
+
+### 🔧 **発展課題（余裕があれば）**
+
+- スケジュールの一括登録機能
+- 曜日別のスケジュール設定
+- スケジュールのコピー機能
+- 上映期間の設定機能
+- スケジュールの重複チェック機能

@@ -34,6 +34,23 @@
     <%= f.submit "Save Changes" %>
   </div>
 <% end %>
+<div style="margin-top: 20px;">
+  <h3>スケジュール管理</h3>
+  <% if @movie.schedules.any? %>
+    <h4>現在のスケジュール</h4>
+    <ul>
+      <% @movie.schedules.order(:start_time).each do |schedule| %>
+        <li>
+          <%= schedule.start_time.strftime("%Y-%m-%d %H:%M") %>
+          <%= link_to "編集",edit_admin_schedule_path(schedule)%>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p>スケジュールはありません</p>
+  <% end %>
+  <%= link_to "スケジュールを追加", new_admin_movie_schedule_path(@movie) %>
+</div>
 <div class="actions">
   <%= link_to '削除', admin_movie_path(@movie), data: {
     turbo_method: :delete,

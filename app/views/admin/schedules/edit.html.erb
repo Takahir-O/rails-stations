@@ -1,0 +1,35 @@
+<% content_for :title,"スケジュール編集"%>
+<h1>スケジュール編集</h1>
+<h2>映画: <%= @movie.name%></h2>
+<% if @schedule.errors.any? %>
+  <div style="color: red;">
+    <ul>
+      <% @schedule.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+<%= form_with model: [:admin, @schedule], local: true do |f| %>
+  <div class="field">
+    <%= f.label :start_time, "開始時刻"%>
+    <%= f.time_field :start_time, required: true %>
+  </div>
+  <div class="field">
+    <%= f.label :end_time, "終了時刻"%>
+    <%= f.time_field :end_time, required: true %>
+  </div>
+  <p><small>※作品IDは変更できません。別の映画のスケジュールにしたい場合は、このスケジュールを削除して新規作成してください</small></p>
+  <div class='actions'>
+    <%= f.submit "更新"%>
+  </div>
+<% end %>
+<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ccc;">
+  <%= link_to "削除",admin_schedule_path(@schedule),data:{
+    turbo_method: :delete,
+    turbo_confirm: "本当に削除しますか？"
+  },
+  style: "background-color:#dc3545; color:white; padding:10px 20px; text-decoration:none;border-radius:4px;"
+  %>
+</div>
+<p><%= link_to "スケジュール一覧に戻る",admin_schedules_path %></p>

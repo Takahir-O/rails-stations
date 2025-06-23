@@ -156,3 +156,30 @@
   background-color: #e9ecef;
   cursor: pointer;
 }
+
+/* スケジュール一覧のスタイル設定 */
+
+.schedule-section{
+  margin-bottom: 30px;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.schedule-table{
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.schedule-table th,
+.schedule-table td{
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.schedule-table th{
+  background-color: #0052a4;
+  color: #fff;
+}

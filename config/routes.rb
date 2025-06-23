@@ -3,8 +3,12 @@ Rails.application.routes.draw do
   get "sheets", to: "sheets#index"
   
   namespace :admin do
-    resources :movies, only: [:index, :new, :create, :edit, :update, :destroy]
+    resources :movies, only: [:index, :new, :create, :edit, :update, :destroy] do
+      resources :schedules, only: [:new, :create]
+    end
+    resources :schedules, only: [:index, :edit, :update, :destroy]
   end
+
   
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
