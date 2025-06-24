@@ -35,7 +35,18 @@ class ReservationsController < ApplicationController
     end
 
     def create
+        # トランザクション内で予約処理を実行
+        ActiveRecord::Base.transaction do
         @reservation = Reservation.new(reservation_params)
+
+        # 保存直前に再度予約状況をチェック
+        if Reservation.exists?(
+            schedule_id:@reservation.schedule_id,
+            sheet_id:@reservation.sheet_id,
+            date:@reservation.date
+        )
+        raise ActiveRecord::RecordNotUnique, "その座席はすでに予約済みです"
+        end
 
         if @reservation.save
             flash[:notice] = "予約が完了しました"

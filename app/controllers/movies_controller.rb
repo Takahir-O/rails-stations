@@ -17,18 +17,13 @@ class MoviesController < ApplicationController
         @movie = Movie.find(params[:id])
         @sheets = Sheet.all
         # クエリパラメータの検証
-        if params[:schedule_id].blank?
-            flash[:alert] = "スケジュールを選択してください"
-            redirect_to movie_path(@movie) and return
-        end
-
-        if params[:date].blank?
-            flash[:alert] = "日付を選択してください"
+        if params[:schedule_id].blank? || params[:date].blank?
+            flash[:alert] = "上映日時を選択してください"
             redirect_to movie_path(@movie) and return
         end
 
         @schedule = @movie.schedules.find(params[:schedule_id])
-        # スケジュールのstart_timeから日付を取得
+        # スケジュールから日付を自動取得
         @date = @schedule.start_time.to_date
         @seats = Sheet.all.order(:row, :column)
 
