@@ -31,4 +31,27 @@ class Reservation < ApplicationRecord
         end
     end
 
+    def seat_must_be_unique_per_screen
+        return unless schedule && sheet &&date
+
+        # 同じスクリーンの座席かをチェックする
+
+        if sheet.screen_id != schedule.screen_id
+            errors.add(:sheet, "は選択されたスケジュールのスクリーンと一致しません")
+            return
+        end
+
+        # 同じ日付・スケジュール・座席の予約存在をチェックする
+        existing_reservation = Reservation.join(
+            date: date,
+            sheet_id: sheet_id,
+            schedule_id: schedule_id
+        ).where.not(id: id).exists?
+
+        if existing_reservation
+            errors.add(:base,"その座席はその日時ですでに予約されています")
+        end
+
+    end
+
 end

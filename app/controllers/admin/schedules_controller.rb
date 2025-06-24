@@ -21,8 +21,8 @@ class Admin::SchedulesController < ApplicationController
 
     # 新しいスケジュールを実際に作成するメソッド
     def create
-        # URLから映画のIDを取得して、その映画を探す
-        @movie = Movie.find(params[:movie_id])
+        # フォームから送られてきた映画IDを取得して、その映画を探す
+        @movie = Movie.find(params[:schedule][:movie_id])
         # フォームから送られてきた情報で新しいスケジュールを作る
         @schedule = @movie.schedules.build(schedule_params)
 
@@ -94,8 +94,8 @@ class Admin::SchedulesController < ApplicationController
 
     # フォームから送られてきた情報で安全に使えるものだけを取り出すメソッド
     def schedule_params
-        # start_time（開始時刻）とend_time（終了時刻）だけを許可する
-        params.require(:schedule).permit(:start_time, :end_time)
+        # start_time（開始時刻）とend_time（終了時刻）とscreen_id（スクリーンID）とmovie_id（映画ID）を許可する
+        params.require(:schedule).permit(:start_time, :end_time, :screen_id, :movie_id)
     end
 
     

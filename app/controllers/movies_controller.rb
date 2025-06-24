@@ -15,7 +15,6 @@ class MoviesController < ApplicationController
 
     def reservation
         @movie = Movie.find(params[:id])
-        @sheets = Sheet.all
         
         # クエリパラメータの検証（schedule_idは必須）
         if params[:schedule_id].blank?
@@ -32,13 +31,16 @@ class MoviesController < ApplicationController
             # スケジュールのstart_timeから日付を自動取得
             @date = @schedule.start_time.to_date
         end
-        
-        @seats = Sheet.all.order(:row, :column)
+        @sheets = @schedule.screen.sheets.order(:row, :column)
+        @seats = @sheets
 
         # すでに予約済みの座席を取得
-        @reserved_sheet_ids = Reservation.where(
+        @reserved_sheet_ids = Reservation.joins(
+            :schedule
+        ).where(
             schedule_id: @schedule.id,
-            date: @date
+            date: @date,
+            sheet_id: @sheets.pluck(:id) #同じスクリーンの座席のみにしている
         ).pluck(:sheet_id)
 
     rescue ActiveRecord::RecordNotFound

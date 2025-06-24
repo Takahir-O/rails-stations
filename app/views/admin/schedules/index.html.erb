@@ -7,6 +7,7 @@
       <thead>
         <tr>
           <th>ID</th>
+          <th>スクリーン</th>
           <th>開始時刻</th>
           <th>終了時刻</th>
           <th>作成日時</th>
@@ -18,6 +19,7 @@
         <% movie.schedules.order(:start_time).each do |schedule| %>
           <tr>
             <td><%= link_to schedule.id, edit_admin_schedule_path(schedule) %></td>
+            <td><%= schedule.screen.name %></td>
             <td><%= schedule.start_time.strftime("%Y-%m-%d %H:%M") %></td>
             <td><%= schedule.end_time.strftime("%Y-%m-%d %H:%M") %></td>
             <td><%= schedule.created_at.strftime("%Y-%m-%d %H:%M") %></td>

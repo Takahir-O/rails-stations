@@ -18,7 +18,7 @@ Rails.application.routes.draw do
         get 'schedules/new', to: 'schedules#new'
       end
     end
-    resources :schedules, only: [:index, :create, :edit, :update, :destroy]
+    resources :schedules, only: [:index,:new,:create, :edit, :update, :destroy]
     resources :reservations
   end
 

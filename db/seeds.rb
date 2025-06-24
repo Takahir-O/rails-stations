@@ -31,46 +31,60 @@ Movie.create!([
   }
 ])
 
-# 座席情報を作成
 
-seats_data = [
-  { column: 1, row: 'a' }, { column: 2, row: 'a' }, { column: 3, row: 'a' }, { column: 4, row: 'a' }, { column: 5, row: 'a' },
-  { column: 1, row: 'b' }, { column: 2, row: 'b' }, { column: 3, row: 'b' }, { column: 4, row: 'b' }, { column: 5, row: 'b' },
-  { column: 1, row: 'c' }, { column: 2, row: 'c' }, { column: 3, row: 'c' }, { column: 4, row: 'c' }, { column: 5, row: 'c' }
-]
-
-
-seats_data.each do |seat|
-  Sheet.find_or_create_by(seat)
+# スクリーンの作成
+puts "スクリーンの作成"
+screens = []
+3.times do |i|
+  screens << Screen.find_or_create_by(name: "スクリーン#{i+1}")
 end
 
-puts "シードデータの作成が完了しました"
-puts "映画: #{Movie.count}件"
-puts "座席: #{Sheet.count}件"
+puts "スクリーンの作成が完了しました"
+puts "スクリーン: #{Screen.count}件"
 
+# 各スクリーンに座席を作成する
+puts "各スクリーンに座席を作成する"
 
-# 上映中の映画
-puts "上映中のスケジュールのテストデータを投入中"
-
-# 上映中の映画にスケジュールを追加
-Movie.where(is_showing: true).each do |movie|
-  # 今日から1週間分のスケジュールを作成
-  (0..6).each do |day_offset|
-    date = Date.current + day_offset.days
-
-    schedule_data = [
-      {start_time: date.beginning_of_day + 10.hours,end_time: date.beginning_of_day + 12.hours},
-      {start_time: date.beginning_of_day + 13.hours,end_time: date.beginning_of_day + 15.hours},
-      {start_time: date.beginning_of_day + 16.hours,end_time: date.beginning_of_day + 18.hours},
-      {start_time: date.beginning_of_day + 19.hours,end_time: date.beginning_of_day + 21.hours},
-      {start_time: date.beginning_of_day + 22.hours,end_time: date.beginning_of_day + 24.hours}
-    ]
-
-    schedule_data.each do |schedule|
-      movie.schedules.find_or_create_by(schedule)
-    end
+screens.each do |screen|
+  seats_data = [
+    {column: 1,row: 'a'},{column: 2,row: 'a'},{column: 3,row: 'a'},{column: 4,row: 'a'},{column: 5,row: 'a'},
+    {column: 1,row: 'b'},{column: 2,row: 'b'},{column: 3,row: 'b'},{column: 4,row: 'b'},{column: 5,row: 'b'},
+    {column: 1,row: 'c'},{column: 2,row: 'c'},{column: 3,row: 'c'},{column: 4,row: 'c'},{column: 5,row: 'c'}
+  ]
+  seats_data.each do |seat|
+    screen.sheets.find_or_create_by(seat)
   end
 end
 
-puts "上映中のスケジュールのテストデータの投入が完了しました"
-puts "スケジュール: #{Schedule.count}件"
+puts "各スクリーンに座席の作成が完了しました"
+puts "座席: #{Sheet.count}件"
+
+
+# 各スクリーンに異なる映画のスケジュールを作成する
+puts "スケジュール作成中"
+
+if Movie.exists?
+  movies = Movie.where(is_showing: true).limit(3)
+
+  movies.each_with_index do |movie,index|
+    screen = screens[index]
+
+    # 既存のスケジュールの削除
+    movie.schedules.destroy_all
+    
+      # 新しいスケジュールを作成（スクリーンを指定）
+    [
+      {start_time: '10:00',end_time: '12:00'},
+      {start_time: '13:00',end_time: '15:00'},
+      {start_time: '16:00',end_time: '18:00'},
+      {start_time: '19:00',end_time: '21:00'},
+      {start_time: '22:00',end_time: '24:00'}
+    ].each do |schedule_data|
+      movie.schedules.create!(
+        start_time: schedule_data[:start_time],
+        end_time: schedule_data[:end_time],
+        screen: screen
+      )
+    end
+  end
+end

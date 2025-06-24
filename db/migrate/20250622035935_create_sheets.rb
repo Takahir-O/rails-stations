@@ -7,6 +7,7 @@ class CreateSheets < ActiveRecord::Migration[7.1]
       t.timestamps
     end
 
-    add_index :sheets, [:row, :column], unique: true
+    # screen_idが追加された後に適切なユニーク制約が追加されるため、ここでは削除
+    # add_index :sheets, [:row, :column], unique: true
   end
 end
