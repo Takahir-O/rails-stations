@@ -1,0 +1,33 @@
+<% content_for :title,"座席選択-#{@movie.name}"%>
+<h1>座席選択</h1>
+<h2><%= @movie.name %></h2>
+<p>
+  日付： <%= @date.strftime("%Y年%m月%d日(%a)")%><br>
+  上映時間： <%= @schedule.start_time.strftime("%Y年%m月%d日(%a) %H:%M")%> - <%= @schedule.end_time.strftime("%H:%M")%><br>
+</p>
+<table>
+  <thead>
+    <tr>
+      <th colspan="5" class="screen">スクリーン</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @seats.group_by(&:row).sort.each do |row, seats| %>
+      <tr>
+        <% seats.sort_by(&:column).each do |seat| %>
+          <td>
+            <% if @reserved_sheet_ids.include?(seat.id) %>
+              <span class="seat reserved"><%= seat.row %>-<%= seat.column %></span>
+            <% else %>
+              <%= link_to "#{seat.row}-#{seat.column}",
+                  new_movie_schedule_reservation_path(@movie, @schedule,
+                    date: @date, sheet_id: seat.id),
+                  class: "seat" %>
+            <% end %>
+          </td>
+        <% end %>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+<p><%= link_to "映画詳細に戻る",movie_path(@movie),class:"btn btn-secondary"%> </p>

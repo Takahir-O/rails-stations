@@ -1,0 +1,54 @@
+<% content_for :title,"予約情報入力" %>
+<h1>予約情報入力</h1>
+<div class="reservation-form">
+  <div class = "reservation-info">
+    <h3>予約内容</h3>
+    <p>
+      <strong>映画：</strong><%= @movie.name%><br>
+      <strong>日付：</strong><%= @date.strftime("%Y年%m月%d日(%a)")%><br>
+      <strong>上映時間：</strong><%= @schedule.start_time.strftime("%H:%M")%> - <%= @schedule.end_time.strftime("%H:%M")%><br>
+      <strong>座席：</strong><%= @sheet.row%>-<%= @sheet.column%><br>
+    </p>
+  </div>
+  <% if @reservation.errors.any? %>
+    <div class = "alert alert-danger">
+      <ul>
+        <% @reservation.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+  <%= form_with model: @reservation,url: reservations_path(@movie,@schedule),local:true do |f| %>
+    <%= hidden_field_tag :movie_id,@movie.id%>
+    <%= f.hidden_field :schedule_id,value: @schedule.id%>
+    <%= f.hidden_field :sheet_id,value: @sheet.id%>
+    <%= f.hidden_field :date,value: @date%>
+
+    <div class="form-group">
+      <%= f.label :name,"お名前"%>
+      <%= f.text_field :name,class: "form-control",required: true,maxlength: 50 %>
+      <% if @reservation.errors[:name].any? %>
+        <div class="error-message">
+          <%= @reservation.errors[:name].first%>
+        </div>
+      <% end %>
+    </div>
+
+    <div class = "form-group">
+        <%= f.label :email,"メールアドレス"%>
+        <%= f.email_field :email,class: "form-control",required: true %>
+        <% if @reservation.errors[:email].any? %>
+            <div class="error-message">
+                <%= @reservation.errors[:email].first %>
+            </div>
+        <% end %>
+    </div>
+
+    <div class="form-actions">
+        <%= f.submit "予約を確定する", class: "btn btn-primary"%>
+        <%= link_to "座席選択に戻る",reservation_movie_path(@movie,schedule_id: @schedule.id,date: @date),class: "btn btn-secondary"%>
+    </div>
+
+  <% end %>
+</div>

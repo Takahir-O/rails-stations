@@ -9,28 +9,47 @@
     <p><strong>概要:</strong><%= @movie.description %></p>
     <p><strong>上映状況:</strong><%= @movie.showing? ? "上映中" : "上映予定" %></p>
   </div>
-
   <% if @movie.is_showing?%>
     <h3>上映スケジュール</h3>
     <% if @movie.schedules.any? %>
-        <table class="schedule-table">
-            <thead>
-                <tr>
-                    <th>上映開始時刻</th>
-                    <th>上映終了時刻</th>
-                </tr>
-            </thead>
-            <tbody>
-                <% @movie.schedules.each do |schedule| %>
-                    <tr>
-                        <td><%= schedule.start_time.strftime("%Y-%m-%d %H:%M") %></td>
-                        <td><%= schedule.end_time.strftime("%Y-%m-%d %H:%M") %></td>
-                    </tr>
-                <% end %>
-            </tbody>
-        </table>
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th>上映開始時刻</th>
+            <th>上映終了時刻</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @movie.schedules.each do |schedule| %>
+            <tr>
+              <td><%= schedule.start_time.strftime("%Y-%m-%d %H:%M") %></td>
+              <td><%= schedule.end_time.strftime("%Y-%m-%d %H:%M") %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
     <% else %>
-        <p>上映スケジュールはありません</p>
+      <p>上映スケジュールはありません</p>
     <% end %>
+  <% end %>
+  <% if @movie.is_showing? && @movie.schedules.any? %>
+    <div class="reservation-section">
+      <h3>座席予約</h3>
+      <%= form_with url: reservation_movie_path(@movie), method: :get, local: true do |f| %>
+        <div class="form-group">
+          <%= label_tag :schedule_id, "上映日時を選択" %>
+          <%= select_tag :schedule_id, 
+            options_from_collection_for_select(
+              @movie.schedules.where('start_time >= ?', Time.current).order(:start_time),
+              :id,
+              ->(s){ "#{s.start_time.strftime('%Y年%m月%d日(%a) %H:%M')} - #{s.end_time.strftime('%H:%M')}" }
+            ),
+            class: "form-control",
+            required: true
+          %>
+        </div>
+        <%= submit_tag "座席を予約する", class: "btn btn-primary" %>
+      <% end %>
+    </div>
   <% end %>
 </div>
