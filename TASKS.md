@@ -3505,7 +3505,7 @@ N+1 問題とは、「1 回のクエリで済むはずが、N+1 回もデータ�
           class: "form-control",
           required: true
         %>
-      </div>
+  </div>
 
       <div class="form-group">
         <%= label_tag :schedule_id, "上映時間を選択" %>
@@ -3519,7 +3519,7 @@ N+1 問題とは、「1 回のクエリで済むはずが、N+1 回もデータ�
           required: true,
           prompt: "時間を選択してください"
         %>
-      </div>
+  </div>
 
       <%= submit_tag "座席を選択する", class: "btn btn-primary" %>
     <% end %>
@@ -4302,7 +4302,7 @@ end
           <li><%= message %></li>
         <% end %>
       </ul>
-    </div>
+  </div>
   <% end %>
 
   <div class="form-group">
@@ -4323,7 +4323,7 @@ end
         ->(s) { "#{s.row}-#{s.column}" },
         { prompt: "選択してください" },
         { class: "form-control", required: true } %>
-  </div>
+    </div>
 
   <div class="form-group">
     <%= f.label :date, "予約日" %>
@@ -4866,9 +4866,9 @@ docker compose exec web bundle exec rails generate migration AddNameToUsers name
 - [ ] name フィールドのバリデーションを追加
 - [ ] 予約との関連付けを設定
 
-```bash
-# User モデルを編集
-docker compose exec web bash -c "cat > app/models/user.rb << 'EOF'
+`app/models/user.rb` を以下のように編集：
+
+```ruby
 class User < ApplicationRecord
   # Include default devise modules. Others available are:
   # :confirmable, :lockable, :timeoutable, :trackable and :omniauthable
@@ -4881,7 +4881,6 @@ class User < ApplicationRecord
   # アソシエーション
   has_many :reservations, dependent: :destroy
 end
-EOF"
 ```
 
 #### 🔍 **初学者向け詳細説明**
@@ -4975,9 +4974,9 @@ end
 - [ ] Reservation モデルにユーザーとのアソシエーションを追加
 - [ ] バリデーションを調整
 
-```bash
-# Reservationモデルを更新
-docker compose exec web bash -c "cat > app/models/reservation.rb << 'EOF'
+`app/models/reservation.rb` を以下のように編集：
+
+```ruby
 class Reservation < ApplicationRecord
   belongs_to :schedule
   belongs_to :sheet
@@ -5037,7 +5036,6 @@ class Reservation < ApplicationRecord
     end
   end
 end
-EOF"
 ```
 
 #### 🔍 **初学者向け詳細説明**
@@ -5050,9 +5048,9 @@ EOF"
 
 - [ ] Application Controller に Devise の Strong Parameters 設定を追加
 
-```bash
-# ApplicationControllerにDeviseの設定を追加
-docker compose exec web bash -c "cat > app/controllers/application_controller.rb << 'EOF'
+`app/controllers/application_controller.rb` を以下のように編集：
+
+```ruby
 class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception
 
@@ -5066,7 +5064,6 @@ class ApplicationController < ActionController::Base
     devise_parameter_sanitizer.permit(:account_update, keys: [:name])
   end
 end
-EOF"
 ```
 
 #### 🔍 **初学者向け詳細説明**
@@ -5082,17 +5079,26 @@ EOF"
 ```bash
 # Deviseのビューを生成
 docker compose exec web bundle exec rails generate devise:views
+```
 
-# 登録フォームにnameフィールドを追加
-docker compose exec web bash -c "sed -i '/<%= f.email_field :email/i\\
-  <div class=\"field\">\\
-    <%= f.label :name %>\\
-    <%= f.text_field :name, autofocus: true, autocomplete: \"name\" %>\\
-  </div>\\
-' app/views/devise/registrations/new.html.erb"
+**手動で編集**: `app/views/devise/registrations/new.html.erb` ファイルを以下のように編集してください：
 
-# 既存のautofocusをemailに変更
-docker compose exec web bash -c "sed -i 's/autofocus: true, autocomplete: \"email\"/autocomplete: \"email\"/' app/views/devise/registrations/new.html.erb"
+1. メールアドレスフィールドの**前に**以下の name フィールドを追加：
+
+```erb
+<div class="field">
+  <%= f.label :name %>
+  <%= f.text_field :name, autofocus: true, autocomplete: "name" %>
+</div>
+```
+
+2. メールアドレスフィールドから `autofocus: true` を削除：
+
+```erb
+<div class="field">
+  <%= f.label :email %>
+  <%= f.email_field :email, autocomplete: "email" %>
+</div>
 ```
 
 #### 🔍 **初学者向け詳細説明**
@@ -5104,9 +5110,9 @@ docker compose exec web bash -c "sed -i 's/autofocus: true, autocomplete: \"emai
 - [ ] 予約関連のコントローラーに認証を追加
 - [ ] ユーザー情報を使った予約処理に変更
 
-```bash
-# MoviesControllerを更新
-docker compose exec web bash -c "cat > app/controllers/movies_controller.rb << 'EOF'
+`app/controllers/movies_controller.rb` を以下のように更新：
+
+```ruby
 class MoviesController < ApplicationController
   def index
     @movies = Movie.all
@@ -5160,7 +5166,6 @@ class MoviesController < ApplicationController
     redirect_to movie_path(@movie)
   end
 end
-EOF"
 ```
 
 ### 11. ReservationsController の更新
@@ -5168,9 +5173,9 @@ EOF"
 - [ ] ユーザー情報を使った予約処理に変更
 - [ ] name, email フィールドを削除
 
-```bash
-# ReservationsControllerを更新
-docker compose exec web bash -c "cat > app/controllers/reservations_controller.rb << 'EOF'
+`app/controllers/reservations_controller.rb` を以下のように更新：
+
+```ruby
 class ReservationsController < ApplicationController
   def new
     @movie = Movie.find(params[:movie_id])
@@ -5209,17 +5214,17 @@ class ReservationsController < ApplicationController
         raise ActiveRecord::RecordNotUnique, "座席はすでに予約されています"
       end
 
-      if @reservation.save
-        flash[:notice] = '予約が完了しました。'
-        redirect_to movie_path(@reservation.schedule.movie)
-      else
-        @movie = Movie.find(params[:movie_id])
-        @schedule = Schedule.find(params[:schedule_id])
-        @sheet = Sheet.find(params[:sheet_id])
-        @date = Date.parse(params[:date])
+    if @reservation.save
+      flash[:notice] = '予約が完了しました。'
+      redirect_to movie_path(@reservation.schedule.movie)
+    else
+      @movie = Movie.find(params[:movie_id])
+      @schedule = Schedule.find(params[:schedule_id])
+      @sheet = Sheet.find(params[:sheet_id])
+      @date = Date.parse(params[:date])
 
-        render :new, status: :bad_request
-      end
+      render :new, status: :bad_request
+    end
     end
 
   rescue ActiveRecord::RecordNotUnique
@@ -5240,7 +5245,6 @@ class ReservationsController < ApplicationController
     params.require(:reservation).permit(:schedule_id, :sheet_id, :date)
   end
 end
-EOF"
 ```
 
 #### 🔍 **初学者向け詳細説明**

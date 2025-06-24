@@ -1,6 +1,7 @@
 class Reservation < ApplicationRecord
     belongs_to :schedule
     belongs_to :sheet
+    belongs_to :user
 
     validates :date,presence:true
     validates :email,presence:true,format:{with: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i}
@@ -8,6 +9,12 @@ class Reservation < ApplicationRecord
     validates :sheet_id, uniqueness: { scope: [:date, :schedule_id], message: "はその日時ですでに予約されています" }
     validate :date_cannot_be_in_the_past
     validate :date_must_be_within_one_week
+
+    # スクリーンを考慮した座席の重複チェック
+    validate :seat_must_be_unique_per_screen
+
+    # nameとemailの削除（userから取得する）
+    delegate :name,:email,to: :user
 
     private
 
