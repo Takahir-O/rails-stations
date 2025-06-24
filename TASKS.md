@@ -4783,6 +4783,904 @@ end
 
 ---
 
+# lesson-14
+
+## 課題概要
+
+ユーザー登録機能を実装し、予約機能をユーザー認証が必要なシステムに変更する。将来的に同じ人がどのような映画をよく見るのかに合わせたクーポンなどを発行できるようにするため、ユーザー登録・ログイン機能を追加する。
+
+### 要件
+
+- ユーザー登録ページ `/users/new` を作成
+- 名前・メールアドレス・パスワード・確認用パスワードを受け取るフォーム
+- パスワードと確認用パスワードが一致するかどうかをバリデーションする
+- メールアドレスをバリデーションする
+- ユーザー登録していないと座席を予約できないようにする
+- 予約時の名前とメール入力部分でユーザー情報を使うようにする
+- 既存の予約データをユーザーに紐づけるマイグレーションを実行
+
+### 技術仕様
+
+- Devise gem を使用してユーザー認証機能を実装
+- User モデルに name フィールドを追加
+- Reservation モデルに user_id を追加
+- 既存の予約データを適切にマイグレーション
+
+## 実装手順
+
+### 1. Devise gem の追加
+
+- [ ] `Gemfile` に devise gem を追加
+- [ ] Docker 環境で bundle install を実行
+
+```bash
+# Dockerコンテナ内でbundle installを実行
+docker compose exec web bundle add devise
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+Devise は Rails で最も人気のある認証 gem です。ユーザー登録、ログイン、パスワードリセットなどの機能を簡単に実装できます。
+
+### 2. Devise の初期設定
+
+- [ ] Devise の設定ファイルを生成
+- [ ] 必要な設定を追加
+
+```bash
+# Deviseの設定ファイルを生成
+docker compose exec web bundle exec rails generate devise:install
+
+# デフォルトURLオプションを設定（development環境）
+echo "config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }" >> config/environments/development.rb
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+`rails generate devise:install` は Devise の設定ファイルや initializer を生成します。メール送信機能などの基本設定が含まれます。
+
+### 3. User モデルの生成
+
+- [ ] Devise を使って User モデルを生成
+- [ ] name フィールドを追加するマイグレーションを作成
+
+```bash
+# DeviseでUserモデルを生成
+docker compose exec web bundle exec rails generate devise User
+
+# nameフィールドを追加するマイグレーションを生成
+docker compose exec web bundle exec rails generate migration AddNameToUsers name:string
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+`rails generate devise User` は以下のファイルを生成します：
+
+- `app/models/user.rb` - User モデル
+- マイグレーションファイル - users テーブル
+- ルーティングの設定が追加される
+
+### 4. User モデルのカスタマイズ
+
+- [ ] `app/models/user.rb` を編集
+- [ ] name フィールドのバリデーションを追加
+- [ ] 予約との関連付けを設定
+
+```bash
+# User モデルを編集
+docker compose exec web bash -c "cat > app/models/user.rb << 'EOF'
+class User < ApplicationRecord
+  # Include default devise modules. Others available are:
+  # :confirmable, :lockable, :timeoutable, :trackable and :omniauthable
+  devise :database_authenticatable, :registerable,
+         :recoverable, :rememberable, :validatable
+
+  # バリデーション
+  validates :name, presence: true, length: { maximum: 50 }
+
+  # アソシエーション
+  has_many :reservations, dependent: :destroy
+end
+EOF"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `devise` モジュールで認証機能を有効化
+- `:database_authenticatable` - パスワード認証
+- `:registerable` - ユーザー登録
+- `:recoverable` - パスワードリセット
+- `:rememberable` - ログイン状態の記憶
+- `:validatable` - メールアドレスとパスワードのバリデーション
+
+### 5. Reservations テーブルに user_id を追加
+
+- [ ] user_id カラムを追加するマイグレーションを生成
+- [ ] 既存データの移行ロジックを実装
+
+```bash
+# user_idカラムを追加するマイグレーションを生成
+docker compose exec web bundle exec rails generate migration AddUserIdToReservations user:references
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+`user:references` は外部キーとインデックスを自動的に設定してくれる便利な記法です。
+
+### 6. 既存データ移行のマイグレーション実装
+
+- [ ] 生成されたマイグレーションファイルを編集
+- [ ] 既存の予約データをユーザーに紐づけるロジックを追加
+
+```bash
+# マイグレーションファイルを見つけて編集
+MIGRATION_FILE=$(docker compose exec web bash -c "ls db/migrate/*add_user_id_to_reservations.rb | head -1")
+echo "マイグレーションファイル: $MIGRATION_FILE"
+
+# マイグレーションファイルの内容を確認・編集するため、ファイルパスを表示
+docker compose exec web bash -c "ls -la db/migrate/*add_user_id_to_reservations.rb"
+```
+
+マイグレーションファイルを以下のように編集：
+
+```ruby
+class AddUserIdToReservations < ActiveRecord::Migration[7.1]
+  def up
+    # 一時的にnullを許可してカラムを追加
+    add_reference :reservations, :user, null: true, foreign_key: true
+
+    # 既存データの移行
+    migrate_existing_reservations
+
+    # null制約を追加
+    change_column_null :reservations, :user_id, false
+  end
+
+  def down
+    remove_reference :reservations, :user, foreign_key: true
+  end
+
+  private
+
+  def migrate_existing_reservations
+    # 既存の予約データに対してユーザーを作成し、紐づける
+    Reservation.where(user_id: nil).find_each do |reservation|
+      # 同じname+emailの組み合わせでユーザーを検索または作成
+      user = User.find_or_create_by(
+        name: reservation.name,
+        email: reservation.email
+      ) do |u|
+        # パスワードはランダムに生成（後でユーザーがリセット可能）
+        u.password = SecureRandom.alphanumeric(12)
+        u.password_confirmation = u.password
+      end
+
+      reservation.update!(user_id: user.id)
+    end
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+このマイグレーションは：
+
+1. user_id カラムを一時的に null 許可で追加
+2. 既存の予約データから name + email でユーザーを作成
+3. 予約をユーザーに紐づけ
+4. 最後に null 制約を追加
+
+### 7. Reservation モデルの更新
+
+- [ ] Reservation モデルにユーザーとのアソシエーションを追加
+- [ ] バリデーションを調整
+
+```bash
+# Reservationモデルを更新
+docker compose exec web bash -c "cat > app/models/reservation.rb << 'EOF'
+class Reservation < ApplicationRecord
+  belongs_to :schedule
+  belongs_to :sheet
+  belongs_to :user
+
+  # バリデーション
+  validates :date, presence: true
+  validate :date_cannot_be_in_the_past, unless: -> { Rails.env.test? }
+  validate :date_must_be_within_one_week, unless: -> { Rails.env.test? }
+
+  # スクリーンを考慮した座席の重複チェック
+  validate :seat_must_be_unique_per_screen
+
+  # nameとemailの削除（userから取得するため）
+  delegate :name, :email, to: :user
+
+  private
+
+  def date_cannot_be_in_the_past
+    return unless date.present?
+
+    if date < Date.today
+      errors.add(:date, 'は今日以降の日付を選択してください')
+    end
+  end
+
+  def date_must_be_within_one_week
+    return unless date.present?
+
+    if date > Date.today + 7.days
+      errors.add(:date, 'は1週間以内の日付を選択してください')
+    end
+  end
+
+  def seat_must_be_unique_per_screen
+    return unless schedule && sheet && date
+
+    # 同じスクリーンの座席かチェック
+    if sheet.screen_id != schedule.screen_id
+      errors.add(:sheet, 'は選択されたスケジュールのスクリーンと一致しません')
+      return
+    end
+
+    # 同じ日付・スケジュール・座席の予約が存在するかチェック
+    existing_reservation = Reservation
+      .joins(:schedule)
+      .where(
+        date: date,
+        schedule_id: schedule_id,
+        sheet_id: sheet_id
+      )
+      .where.not(id: id) # 自分自身を除外（更新時）
+      .exists?
+
+    if existing_reservation
+      errors.add(:sheet, 'はその日時ですでに予約されています')
+    end
+  end
+end
+EOF"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `belongs_to :user` でユーザーとの関連付け
+- `delegate :name, :email, to: :user` でユーザーの name と email にアクセス可能
+- name, email フィールドを削除（user 経由でアクセス）
+
+### 8. Strong Parameters の設定
+
+- [ ] Application Controller に Devise の Strong Parameters 設定を追加
+
+```bash
+# ApplicationControllerにDeviseの設定を追加
+docker compose exec web bash -c "cat > app/controllers/application_controller.rb << 'EOF'
+class ApplicationController < ActionController::Base
+  protect_from_forgery with: :exception
+
+  before_action :authenticate_user!, except: [:index, :show]
+  before_action :configure_permitted_parameters, if: :devise_controller?
+
+  private
+
+  def configure_permitted_parameters
+    devise_parameter_sanitizer.permit(:sign_up, keys: [:name])
+    devise_parameter_sanitizer.permit(:account_update, keys: [:name])
+  end
+end
+EOF"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `authenticate_user!` で認証が必要なページを制限
+- `configure_permitted_parameters` で Devise のフォームに name フィールドを許可
+
+### 9. Devise のビューを生成・カスタマイズ
+
+- [ ] Devise のビューファイルを生成
+- [ ] 登録フォームに name フィールドを追加
+
+```bash
+# Deviseのビューを生成
+docker compose exec web bundle exec rails generate devise:views
+
+# 登録フォームにnameフィールドを追加
+docker compose exec web bash -c "sed -i '/<%= f.email_field :email/i\\
+  <div class=\"field\">\\
+    <%= f.label :name %>\\
+    <%= f.text_field :name, autofocus: true, autocomplete: \"name\" %>\\
+  </div>\\
+' app/views/devise/registrations/new.html.erb"
+
+# 既存のautofocusをemailに変更
+docker compose exec web bash -c "sed -i 's/autofocus: true, autocomplete: \"email\"/autocomplete: \"email\"/' app/views/devise/registrations/new.html.erb"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+`rails generate devise:views` で Devise の標準ビューをアプリケーションにコピーし、カスタマイズ可能にします。
+
+### 10. 認証機能の追加
+
+- [ ] 予約関連のコントローラーに認証を追加
+- [ ] ユーザー情報を使った予約処理に変更
+
+```bash
+# MoviesControllerを更新
+docker compose exec web bash -c "cat > app/controllers/movies_controller.rb << 'EOF'
+class MoviesController < ApplicationController
+  def index
+    @movies = Movie.all
+    @movies = @movies.search_by_keyword(params[:keyword]) if params[:keyword].present?
+    @movies = @movies.filter_by_showing(params[:is_showing]) if params[:is_showing].present?
+  end
+
+  def show
+    @movie = Movie.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    flash[:alert] = '指定された映画が見つかりません。'
+    redirect_to movies_path
+  end
+
+  def reservation
+    @movie = Movie.find(params[:id])
+
+    # クエリパラメータの検証
+    if params[:schedule_id].blank?
+      flash[:alert] = 'スケジュールを選択してください。'
+      redirect_to movie_path(@movie) and return
+    end
+
+    if params[:date].blank?
+      flash[:alert] = '日付を選択してください。'
+      redirect_to movie_path(@movie) and return
+    end
+
+    @schedule = @movie.schedules.find(params[:schedule_id])
+    @date = Date.parse(params[:date])
+
+    # 選択されたスケジュールのスクリーンの座席のみ取得
+    @sheets = @schedule.screen.sheets.order(:row, :column)
+    @seats = @sheets  # 互換性のため
+
+    # 予約済みの座席IDを取得（同じスクリーン内のみ）
+    @reserved_sheet_ids = Reservation
+      .joins(:schedule)
+      .where(
+        schedule_id: @schedule.id,
+        date: @date,
+        sheet_id: @sheets.pluck(:id)
+      )
+      .pluck(:sheet_id)
+
+  rescue ActiveRecord::RecordNotFound
+    flash[:alert] = '指定されたスケジュールが見つかりません。'
+    redirect_to movie_path(@movie)
+  rescue ArgumentError
+    flash[:alert] = '日付の形式が正しくありません。'
+    redirect_to movie_path(@movie)
+  end
+end
+EOF"
+```
+
+### 11. ReservationsController の更新
+
+- [ ] ユーザー情報を使った予約処理に変更
+- [ ] name, email フィールドを削除
+
+```bash
+# ReservationsControllerを更新
+docker compose exec web bash -c "cat > app/controllers/reservations_controller.rb << 'EOF'
+class ReservationsController < ApplicationController
+  def new
+    @movie = Movie.find(params[:movie_id])
+    @schedule = @movie.schedules.find(params[:schedule_id])
+    @sheet = Sheet.find(params[:sheet_id])
+    @date = Date.parse(params[:date])
+
+    # すでに予約済みかチェック
+    if Reservation.exists?(schedule_id: @schedule.id, sheet_id: @sheet.id, date: @date)
+      flash[:alert] = 'その座席はすでに予約済みです。別の座席を選択してください。'
+      redirect_to reservation_movie_path(@movie, schedule_id: @schedule.id, date: @date)
+      return
+    end
+
+    @reservation = current_user.reservations.build
+
+  rescue ActiveRecord::RecordNotFound
+    flash[:alert] = '指定された情報が見つかりません。'
+    redirect_to movies_path
+  rescue ArgumentError
+    flash[:alert] = '日付の形式が正しくありません。'
+    redirect_to movies_path
+  end
+
+  def create
+    # トランザクション内で予約処理を実行
+    ActiveRecord::Base.transaction do
+      @reservation = current_user.reservations.build(reservation_params)
+
+      # 保存直前に再度予約状況をチェック
+      if Reservation.exists?(
+        schedule_id: @reservation.schedule_id,
+        sheet_id: @reservation.sheet_id,
+        date: @reservation.date
+      )
+        raise ActiveRecord::RecordNotUnique, "座席はすでに予約されています"
+      end
+
+      if @reservation.save
+        flash[:notice] = '予約が完了しました。'
+        redirect_to movie_path(@reservation.schedule.movie)
+      else
+        @movie = Movie.find(params[:movie_id])
+        @schedule = Schedule.find(params[:schedule_id])
+        @sheet = Sheet.find(params[:sheet_id])
+        @date = Date.parse(params[:date])
+
+        render :new, status: :bad_request
+      end
+    end
+
+  rescue ActiveRecord::RecordNotUnique
+    flash[:alert] = 'その座席は他の方が予約しました。別の座席を選択してください。'
+    redirect_to reservation_movie_path(
+      Movie.find(params[:movie_id]),
+      schedule_id: params[:schedule_id],
+      date: params[:date]
+    )
+  rescue => e
+    flash[:alert] = '予約の処理中にエラーが発生しました。'
+    redirect_to movies_path
+  end
+
+  private
+
+  def reservation_params
+    params.require(:reservation).permit(:schedule_id, :sheet_id, :date)
+  end
+end
+EOF"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `current_user.reservations.build` で現在のユーザーに紐づく予約を作成
+- name, email の入力は不要（ユーザー情報から自動取得）
+
+### 12. 予約フォームビューの更新
+
+- [ ] name, email フィールドを削除
+- [ ] ユーザー情報表示を追加
+
+```bash
+# 予約フォームを更新
+docker compose exec web bash -c "cat > app/views/reservations/new.html.erb << 'EOF'
+<% content_for :title, \"予約情報入力\" %>
+
+<style>
+  .reservation-form {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
+  .reservation-info {
+    background-color: #f8f9fa;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+  }
+  .user-info {
+    background-color: #e9ecef;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+  }
+  .form-group {
+    margin-bottom: 15px;
+  }
+  .form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  .error-message {
+    color: #dc3545;
+    font-size: 0.9em;
+    margin-top: 5px;
+  }
+</style>
+
+<h1>予約情報入力</h1>
+
+<div class=\"reservation-form\">
+  <div class=\"user-info\">
+    <h3>予約者情報</h3>
+    <p>
+      <strong>名前:</strong> <%= current_user.name %><br>
+      <strong>メールアドレス:</strong> <%= current_user.email %>
+    </p>
+  </div>
+
+  <div class=\"reservation-info\">
+    <h3>予約内容</h3>
+    <p>
+      <strong>映画:</strong> <%= @movie.name %><br>
+      <strong>日付:</strong> <%= @date.strftime(\"%Y年%m月%d日(%a)\") %><br>
+      <strong>上映時間:</strong> <%= @schedule.start_time.strftime(\"%H:%M\") %> - <%= @schedule.end_time.strftime(\"%H:%M\") %><br>
+      <strong>座席:</strong> <%= @sheet.row %>-<%= @sheet.column %>
+    </p>
+  </div>
+
+  <% if @reservation.errors.any? %>
+    <div class=\"alert alert-danger\">
+      <ul>
+        <% @reservation.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with model: @reservation, url: reservations_path, local: true do |f| %>
+    <%= hidden_field_tag :movie_id, @movie.id %>
+    <%= f.hidden_field :schedule_id, value: @schedule.id %>
+    <%= f.hidden_field :sheet_id, value: @sheet.id %>
+    <%= f.hidden_field :date, value: @date %>
+
+    <div class=\"form-actions\">
+      <%= f.submit \"予約を確定する\", class: \"btn btn-primary\" %>
+      <%= link_to \"座席選択に戻る\",
+          reservation_movie_path(@movie, schedule_id: @schedule.id, date: @date),
+          class: \"btn btn-secondary\" %>
+    </div>
+  <% end %>
+</div>
+EOF"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `current_user` でログイン中のユーザー情報を表示
+- name, email の入力フィールドは削除
+- ユーザー情報を視覚的に分かりやすく表示
+
+### 13. 管理画面の更新
+
+- [ ] Admin::ReservationsController を更新
+- [ ] ユーザー情報を表示するよう調整
+
+```bash
+# 管理画面の予約一覧を更新
+docker compose exec web bash -c "cat > app/views/admin/reservations/index.html.erb << 'EOF'
+<% content_for :title, \"予約管理\" %>
+
+<style>
+  .reservations-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  .reservations-table th,
+  .reservations-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+  }
+  .reservations-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+  }
+  .action-links a {
+    margin-right: 10px;
+  }
+</style>
+
+<h1>予約一覧</h1>
+
+<p><%= link_to \"新規予約追加\", new_admin_reservation_path, class: \"btn btn-primary\" %></p>
+
+<% if @reservations.any? %>
+  <table class=\"reservations-table\">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>映画作品</th>
+        <th>座席</th>
+        <th>日時</th>
+        <th>ユーザー名</th>
+        <th>メールアドレス</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @reservations.each do |reservation| %>
+        <tr>
+          <td><%= reservation.id %></td>
+          <td><%= reservation.schedule.movie.name %></td>
+          <td><%= reservation.sheet.row %>-<%= reservation.sheet.column %></td>
+          <td>
+            <%= reservation.date.strftime(\"%Y年%m月%d日\") %>
+            <%= reservation.schedule.start_time.strftime(\"%H:%M\") %>
+          </td>
+          <td><%= reservation.user.name %></td>
+          <td><%= reservation.user.email %></td>
+          <td class=\"action-links\">
+            <%= link_to \"編集\", admin_reservation_path(reservation) %>
+            <%= link_to \"削除\", admin_reservation_path(reservation),
+                method: :delete,
+                data: { confirm: \"この予約を削除しますか？\" } %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% else %>
+  <p>現在、表示する予約はありません。</p>
+<% end %>
+EOF"
+```
+
+### 14. ナビゲーションの追加
+
+- [ ] ヘッダーにログイン/ログアウトリンクを追加
+
+```bash
+# ナビゲーションを更新
+docker compose exec web bash -c "cat > app/views/layouts/application.html.erb << 'EOF'
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rails Stations</title>
+    <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= stylesheet_link_tag \"application\", \"data-turbo-track\": \"reload\" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body>
+    <nav style=\"background-color: #f8f9fa; padding: 10px; margin-bottom: 20px;\">
+      <%= link_to \"映画一覧\", movies_path, style: \"margin-right: 20px;\" %>
+      <%= link_to \"座席表\", sheets_path, style: \"margin-right: 20px;\" %>
+
+      <div style=\"float: right;\">
+        <% if user_signed_in? %>
+          こんにちは、<%= current_user.name %>さん
+          <%= link_to \"ログアウト\", destroy_user_session_path, method: :delete, style: \"margin-left: 10px;\" %>
+        <% else %>
+          <%= link_to \"ログイン\", new_user_session_path, style: \"margin-right: 10px;\" %>
+          <%= link_to \"会員登録\", new_user_registration_path %>
+        <% end %>
+      </div>
+    </nav>
+
+    <% if notice %>
+      <div style=\"color: green; padding: 10px; margin: 10px 0;\">
+        <%= notice %>
+      </div>
+    <% end %>
+
+    <% if alert %>
+      <div style=\"color: red; padding: 10px; margin: 10px 0;\">
+        <%= alert %>
+      </div>
+    <% end %>
+
+    <%= yield %>
+  </body>
+</html>
+EOF"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- `user_signed_in?` でログイン状態を判定
+- `current_user` で現在のユーザー情報にアクセス
+- ログイン/ログアウトのリンクを動的に表示
+
+### 15. マイグレーションの実行
+
+- [ ] すべてのマイグレーションを実行
+- [ ] データの移行が正しく行われることを確認
+
+```bash
+# マイグレーションを実行
+docker compose exec web bundle exec rails db:migrate
+
+# データの確認
+docker compose exec web bundle exec rails console -e development << 'EOF'
+# ユーザー数を確認
+puts "ユーザー数: #{User.count}"
+
+# 予約数を確認
+puts "予約数: #{Reservation.count}"
+
+# すべての予約にユーザーが紐づいているか確認
+reservations_without_user = Reservation.where(user_id: nil).count
+puts "ユーザーが紐づいていない予約: #{reservations_without_user}"
+
+# サンプルデータの表示
+if Reservation.exists?
+  reservation = Reservation.includes(:user).first
+  puts "サンプル予約: #{reservation.user.name} (#{reservation.user.email})"
+end
+
+exit
+EOF
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+マイグレーション実行後、既存の予約データが適切にユーザーに紐づけられているかを確認します。
+
+### 16. テストデータの準備
+
+- [ ] 開発環境用のユーザーを作成
+- [ ] テストが正常に実行できることを確認
+
+```bash
+# テスト用ユーザーを作成
+docker compose exec web bundle exec rails console -e development << 'EOF'
+# テストユーザーを作成
+test_user = User.find_or_create_by(email: 'test@example.com') do |user|
+  user.name = 'テストユーザー'
+  user.password = 'password'
+  user.password_confirmation = 'password'
+end
+
+puts "テストユーザーを作成しました: #{test_user.name} (#{test_user.email})"
+exit
+EOF
+```
+
+### 17. 動作確認
+
+- [ ] サーバーを起動
+- [ ] ユーザー登録機能の動作確認
+- [ ] ログイン機能の動作確認
+- [ ] 予約機能の動作確認
+
+```bash
+# サーバーを起動
+docker compose up
+
+# 別のターミナルで動作確認用のコマンド
+echo "以下のURLで動作確認を行ってください:"
+echo "- 映画一覧: http://localhost:3000/movies"
+echo "- ユーザー登録: http://localhost:3000/users/sign_up"
+echo "- ログイン: http://localhost:3000/users/sign_in"
+echo "- 管理画面: http://localhost:3000/admin/reservations"
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+動作確認では以下を重点的にチェック：
+
+1. **ユーザー登録**: 名前、メール、パスワードで登録できるか
+2. **ログイン**: 登録したユーザーでログインできるか
+3. **予約**: ログインユーザーのみ予約できるか
+4. **管理画面**: 既存の予約がユーザーと紐づいているか
+
+### 18. エラーケースの確認
+
+- [ ] 未ログインユーザーの予約アクセス制限
+- [ ] バリデーションエラーの表示
+- [ ] 重複メールアドレスでの登録エラー
+
+```bash
+# 認証が必要なページの確認
+curl -i http://localhost:3000/movies/1/reservation
+
+# 期待される結果: 302 リダイレクト（ログインページへ）
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+認証が正しく機能しているかを確認：
+
+- 未ログインユーザーは予約ページにアクセスできない
+- 適切にログインページにリダイレクトされる
+
+### 19. テスト実行
+
+- [ ] station14 のテストを実行
+- [ ] すべてのテストが通ることを確認
+
+```bash
+# テストを実行
+docker compose exec web bundle exec rspec spec/station14/users_request_spec.rb
+
+# 全テストの実行
+docker compose exec web bundle exec rspec
+```
+
+## 参考情報
+
+### 必要なファイル（新規作成・編集）
+
+- `Gemfile`（devise gem 追加）
+- `app/models/user.rb`（新規作成）
+- `app/models/reservation.rb`（編集）
+- `app/controllers/application_controller.rb`（編集）
+- `app/controllers/movies_controller.rb`（編集）
+- `app/controllers/reservations_controller.rb`（編集）
+- `app/views/devise/registrations/new.html.erb`（編集）
+- `app/views/reservations/new.html.erb`（編集）
+- `app/views/layouts/application.html.erb`（編集）
+- `db/migrate/*_devise_create_users.rb`（新規作成）
+- `db/migrate/*_add_name_to_users.rb`（新規作成）
+- `db/migrate/*_add_user_id_to_reservations.rb`（新規作成）
+
+### Devise の主要機能
+
+1. **ユーザー登録**: `/users/sign_up`
+2. **ログイン**: `/users/sign_in`
+3. **ログアウト**: `/users/sign_out`
+4. **パスワードリセット**: `/users/password/new`
+5. **アカウント編集**: `/users/edit`
+
+### データベース構造
+
+```
+users
+  - id
+  - name
+  - email (unique)
+  - encrypted_password
+  - reset_password_token
+  - reset_password_sent_at
+  - remember_created_at
+  - created_at
+  - updated_at
+
+reservations
+  - id
+  - user_id (新規追加)
+  - schedule_id
+  - sheet_id
+  - date
+  - created_at
+  - updated_at
+```
+
+### テスト項目（station14）
+
+- POST /users で必須項目が全て入力されていればユーザー登録ができる（302 ステータス）
+- 必須項目（name, email, password, password_confirmation）が空文字の時は登録できない
+- 必須項目が null の時は登録できない
+- 必須項目が欠けている時は登録できない
+- パスワードと確認用パスワードが一致しない時は登録できない
+
+### 🎯 **初学者向け重要ポイント**
+
+1. **Devise の強力さ**: 数行の設定で本格的な認証機能を実装
+2. **データ移行**: 既存データを壊さずに新機能を追加する技術
+3. **Strong Parameters**: セキュリティを保つための必須設定
+4. **delegate**: 関連モデルの属性に簡単にアクセスする方法
+5. **before_action**: コントローラーでの共通処理の実装
+
+### 🚨 **注意事項**
+
+- 既存の予約データは適切にユーザーに紐づける
+- name, email フィールドは Reservation テーブルから削除
+- 認証が必要なページを適切に制限する
+- パスワードは十分な強度を要求する
+
+### 🔧 **発展課題（余裕があれば）**
+
+- メール確認機能の追加
+- ユーザープロフィール画像のアップロード
+- ソーシャルログイン（Google, Facebook）
+- 二段階認証の実装
+- ユーザーの予約履歴表示機能
+
+---
+
 # lesson-13
 
 ## 課題概要
