@@ -61,6 +61,7 @@ class ReservationsController < ApplicationController
 
             render :new,status: :bad_request
         end
+        end  # transaction do ブロックの終了
 
     rescue ActiveRecord::RecordNotUnique
         flash[:alert] = "その座席はすでに予約済みです"

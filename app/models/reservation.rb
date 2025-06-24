@@ -5,6 +5,7 @@ class Reservation < ApplicationRecord
     validates :date,presence:true
     validates :email,presence:true,format:{with: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i}
     validates :name,presence:true,length:{maximum:50}
+    validates :sheet_id, uniqueness: { scope: [:date, :schedule_id], message: "はその日時ですでに予約されています" }
     validate :date_cannot_be_in_the_past
     validate :date_must_be_within_one_week
 

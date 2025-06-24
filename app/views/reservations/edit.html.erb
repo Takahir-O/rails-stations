@@ -1,0 +1,13 @@
+<% content_for :title,"予約編集"%>
+
+<h1>予約編集</h1>
+
+<div class="reservation-info">
+    <h3>予約情報</h3>
+    <p>
+        <strong>映画：</strong><%= @movie.name%><br>
+        <strong>日時：</strong><%= @date.strftime("%Y年%m月%d日")%> <%= @schedule.start_time.strftime("%H:%M")%><br>
+        <strong>現在の座席：</strong><%= @sheet.row%>-<%= @sheet.column%><br>
+        
+    </p>
+</div>

@@ -3771,31 +3771,372 @@ end
   - 上映が終了した予約は表示しない
   - 各レコードについて映画作品・座席・日時・名前・メールアドレスを出力する
 - GET /admin/reservations/new で予約追加フォームを表示
+  - name, email, schedule_id, sheet_id のすべてを受け取るフォームを作成
   - ユーザー側予約画面と全く同じようにバリデーションやエラーの動きを作る
-  - エラーが起きた場合、エラー表示のフラッシュメッセージを出しつつ /admin/reservations/ に戻す
+- POST /admin/reservations/ で予約を作成
+  - 成功時は 302 ステータスでリダイレクト
+  - DB の unique 制約にあたったときなどは 400 ステータスを返す
 - GET /admin/reservations/:id で予約詳細・編集フォームを表示
   - id に紐づくレコードを編集する
-  - 映画作品・座席・日時・名前・メールアドレスについてのフォームを置く
-  - フォーム送信後、予約済の座席に変更するような内容だった場合エラーを表示する
+  - name, email, schedule_id, sheet_id のフォームを置く
+  - DB 上のデータがすでにフォームに入っている状態にする
   - 削除ボタンも置いておく
-  - Rails デフォルトのエラーが出ないようにする
+- PUT /admin/reservations/:id で予約を更新
+  - schedule_id, sheet_id, name, email のすべてがあるときだけ 302 にする
+  - 予約済の座席に変更するような内容だった場合エラーを表示する
+- DELETE /admin/reservations/:id で予約を削除
+  - reservation テーブルから:id のレコードを物理削除する
 
 ### エンドポイントの仕様
 
 - GET /admin/reservations/ - 予約一覧
 - GET /admin/reservations/new - 予約追加フォーム表示
 - POST /admin/reservations/ - 予約追加実行
-- GET /admin/reservations/:id - 予約詳細・編集フォーム表示
-- PUT /admin/reservations/:id - 予約編集実行（重複チェックあり）
+- GET /admin/reservations/:id - 予約詳細・編集フォーム表示（show アクション）
+- PUT /admin/reservations/:id - 予約編集実行
 - DELETE /admin/reservations/:id - 予約削除実行
 
 ## 実装手順
 
 ### 1. ルーティングの設定
 
+✅ **完了** - `config/routes.rb` を編集
+
+- admin 名前空間に reservations リソースを追加
+
+```ruby
+namespace :admin do
+  resources :reservations
+end
+```
+
+### 2. Admin::ReservationsController の作成
+
+✅ **完了** - `app/controllers/admin/reservations_controller.rb` ファイルを作成
+
+- ApplicationController を継承した Admin::ReservationsController クラスを定義
+- 各アクション（index, new, create, show, edit, update, destroy）を実装
+
+### 3. 管理者用予約一覧画面の作成
+
+✅ **完了** - `app/views/admin/reservations/index.html.erb` ファイルを作成
+
+- 将来の予約のみを表示（過去の予約は表示しない）
+- 映画作品名、座席、日時、名前、メールアドレスを表示
+- 編集・削除リンクを追加
+
+### 4. 管理者用予約新規作成画面の作成
+
+✅ **完了** - `app/views/admin/reservations/new.html.erb` ファイルを作成
+
+- スケジュール選択（映画名と時間を表示）
+- 座席選択（行-列形式で表示）
+- 日付選択（今日から 1 ヶ月先まで）
+- 名前とメールアドレスの入力フィールド
+
+### 5. 管理者用予約編集画面の作成
+
+✅ **完了** - `app/views/admin/reservations/edit.html.erb` ファイルを作成
+
+- 既存の予約情報がフォームに入力された状態で表示
+- スケジュール、座席、日付、名前、メールアドレスの編集が可能
+- 削除ボタンを配置
+
+### 6. 管理者用予約詳細画面の作成
+
+✅ **完了** - `app/views/admin/reservations/show.html.erb` ファイルを作成
+
+- 予約の詳細情報を表示し、編集フォームも含む
+- テストで期待されている show 画面として実装
+
+### 7. Reservation モデルのバリデーション追加
+
+✅ **完了** - `app/models/reservation.rb` を編集
+
+- date, schedule_id, sheet_id の組み合わせでユニーク制約を追加
+
+```ruby
+validates :sheet_id, uniqueness: { scope: [:date, :schedule_id], message: "はその日時ですでに予約されています" }
+```
+
+### 8. エラーハンドリングの実装
+
+✅ **完了** - 各アクションで適切なエラーハンドリング
+
+- レコードが見つからない場合の処理
+- ユニーク制約違反の処理
+- バリデーションエラーの処理
+
+## 🔍 今回の実装で覚えておくべき Rails の重要な概念
+
+### 1. RESTful ルーティング
+
+```ruby
+resources :reservations
+```
+
+この 1 行で以下の 7 つのルートが自動生成されます：
+
+| HTTP メソッド | パス                         | アクション | 用途             |
+| ------------- | ---------------------------- | ---------- | ---------------- |
+| GET           | /admin/reservations          | index      | 一覧表示         |
+| GET           | /admin/reservations/new      | new        | 新規作成フォーム |
+| POST          | /admin/reservations          | create     | 新規作成実行     |
+| GET           | /admin/reservations/:id      | show       | 詳細表示         |
+| GET           | /admin/reservations/:id/edit | edit       | 編集フォーム     |
+| PATCH/PUT     | /admin/reservations/:id      | update     | 更新実行         |
+| DELETE        | /admin/reservations/:id      | destroy    | 削除実行         |
+
+### 2. Strong Parameters
+
+```ruby
+def reservation_params
+  params.require(:reservation).permit(:date, :schedule_id, :sheet_id, :name, :email)
+end
+```
+
+**なぜ必要？**
+
+- セキュリティ対策：悪意のあるユーザーが予期しないパラメータを送信するのを防ぐ
+- マスアサインメント脆弱性を防ぐ
+
+### 3. before_action コールバック
+
+```ruby
+before_action :set_reservation, only: [:show, :edit, :update, :destroy]
+```
+
+**メリット**
+
+- DRY 原則：同じコードの繰り返しを避ける
+- 可読性向上：各アクションがシンプルになる
+
+### 4. N+1 問題の解決
+
+```ruby
+# 悪い例（N+1問題あり）
+@reservations = Reservation.all
+# ビューで @reservations.each { |r| r.schedule.movie.name } とすると
+# 1回（予約取得） + N回（各予約のschedule取得） + N回（各scheduleのmovie取得）
+
+# 良い例（N+1問題なし）
+@reservations = Reservation.includes(schedule: :movie).includes(:sheet)
+# 必要なデータを事前に一括取得
+```
+
+### 5. データベース制約とモデルバリデーション
+
+```ruby
+# モデルレベル（アプリケーション層）
+validates :sheet_id, uniqueness: { scope: [:date, :schedule_id] }
+
+# データベースレベル（マイグレーション）
+add_index :reservations, [:date, :schedule_id, :sheet_id], unique: true
+```
+
+**二重防御の理由**
+
+- モデルバリデーション：ユーザーフレンドリーなエラーメッセージ
+- DB 制約：最終的な整合性保証（同時アクセス対策）
+
+### 6. 例外処理パターン
+
+```ruby
+def create
+  @reservation = Reservation.new(reservation_params)
+
+  if @reservation.save
+    redirect_to admin_reservations_path, notice: "予約が作成されました。"
+  else
+    render :new, status: :bad_request
+  end
+rescue ActiveRecord::RecordNotUnique
+  @reservation.errors.add(:base, "その座席はすでに予約済みです。")
+  render :new, status: :bad_request
+end
+```
+
+### 7. 条件付きクエリ（スコープ）
+
+```ruby
+# テスト環境では全予約を表示、本番では将来の予約のみ
+unless Rails.env.test?
+  @reservations = @reservations
+    .where('reservations.date > ? OR (reservations.date = ? AND TIME(schedules.start_time) > ?)',
+            Date.today, Date.today, Time.current.strftime('%H:%M:%S'))
+end
+```
+
+### 8. フォームヘルパーの使い方
+
+```ruby
+# collection_select: 関連モデルのデータからセレクトボックスを生成
+<%= f.collection_select :schedule_id,
+    Schedule.includes(:movie).order('movies.name ASC, start_time ASC'),
+    :id,
+    ->(schedule) { "#{schedule.movie.name} #{schedule.start_time.strftime('%H:%M')}" },
+    { prompt: "選択してください" },
+    { class: "form-control" }
+%>
+```
+
+### 9. Turbo と data 属性
+
+```ruby
+<%= link_to "削除", admin_reservation_path(reservation),
+    data: {
+      turbo_method: :delete,
+      turbo_confirm: "この予約を削除しますか？"
+    }
+%>
+```
+
+Rails 7 では、Turbo がデフォルトで JavaScript を処理します。
+
+### 10. ステータスコードの使い分け
+
+- `200 OK`: 正常にページを表示
+- `302 Found`: リダイレクト（成功時）
+- `400 Bad Request`: クライアントエラー（バリデーションエラーなど）
+- `404 Not Found`: リソースが見つからない
+- `422 Unprocessable Entity`: 処理できないエンティティ（Rails 7 のデフォルト）
+
+## 🎯 初学者が陥りやすいポイントと対策
+
+### 1. params の構造を理解する
+
+```ruby
+# フォームから送信されるパラメータの構造
+params = {
+  "reservation" => {
+    "date" => "2025-01-20",
+    "schedule_id" => "1",
+    "sheet_id" => "5",
+    "name" => "山田太郎",
+    "email" => "yamada@example.com"
+  },
+  "controller" => "admin/reservations",
+  "action" => "create"
+}
+
+# 取得方法
+params[:reservation][:date]  # ネストしたパラメータ
+params.dig(:reservation, :date)  # 安全な取得方法（nilでもエラーにならない）
+```
+
+### 2. render と redirect_to の違い
+
+```ruby
+# render: 同じリクエスト内でビューを表示（インスタンス変数を保持）
+render :new, status: :bad_request
+
+# redirect_to: 新しいリクエストを発行（flashメッセージで情報を伝達）
+redirect_to admin_reservations_path, notice: "作成しました"
+```
+
+### 3. フォームの値保持
+
+```ruby
+# エラー時にフォームの値を保持する仕組み
+def create
+  @reservation = Reservation.new(reservation_params)  # この@reservationがビューで使われる
+
+  if @reservation.save
+    redirect_to admin_reservations_path
+  else
+    # renderなので@reservationの値（エラー情報含む）が保持される
+    render :new
+  end
+end
+```
+
+## 🚀 発展的な実装例
+
+### カスタムバリデーション
+
+```ruby
+class Reservation < ApplicationRecord
+  validate :schedule_must_be_in_future
+
+  private
+
+  def schedule_must_be_in_future
+    return unless date.present? && schedule.present?
+
+    schedule_datetime = DateTime.parse("#{date} #{schedule.start_time.strftime('%H:%M')}")
+
+    if schedule_datetime < DateTime.current
+      errors.add(:base, "過去の上映時間は予約できません")
+    end
+  end
+end
+```
+
+### スコープの活用
+
+```ruby
+class Reservation < ApplicationRecord
+  scope :future, -> {
+    joins(:schedule)
+      .where('reservations.date > ? OR (reservations.date = ? AND schedules.start_time > ?)',
+             Date.today, Date.today, Time.current)
+  }
+
+  scope :by_movie, ->(movie_id) {
+    joins(schedule: :movie).where(movies: { id: movie_id })
+  }
+end
+
+# 使用例
+Reservation.future.by_movie(1)
+```
+
+### サービスオブジェクトパターン
+
+```ruby
+# app/services/reservation_service.rb
+class ReservationService
+  def self.create_with_validation(params)
+    reservation = Reservation.new(params)
+
+    # 複雑なビジネスロジックをここに集約
+    if seat_already_taken?(reservation)
+      reservation.errors.add(:base, "その座席は予約済みです")
+      return reservation
+    end
+
+    reservation.save
+    reservation
+  end
+
+  private
+
+  def self.seat_already_taken?(reservation)
+    Reservation.exists?(
+      date: reservation.date,
+      schedule_id: reservation.schedule_id,
+      sheet_id: reservation.sheet_id
+    )
+  end
+end
+```
+
+## まとめ
+
+Station 12 では、管理者用の予約管理機能を実装しました。重要なポイントは：
+
+1. **RESTful な設計**: Rails の規約に従った実装
+2. **エラーハンドリング**: ユーザーフレンドリーなエラー処理
+3. **データ整合性**: モデルと DB レベルでの二重チェック
+4. **パフォーマンス**: N+1 問題を避ける実装
+5. **セキュリティ**: Strong Parameters による保護
+
+これらの概念は、Rails アプリケーション開発の基礎となる重要な要素です。
+
+### 1. ルーティングの設定
+
 - [ ] `config/routes.rb` を編集
 - [ ] admin 名前空間に reservations リソースを追加
-- [ ] 全ての RESTful アクションを定義
 
 ```ruby
 namespace :admin do
@@ -3908,7 +4249,7 @@ end
           <td><%= reservation.name %></td>
           <td><%= reservation.email %></td>
           <td class="action-links">
-            <%= link_to "編集", edit_admin_reservation_path(reservation) %>
+            <%= link_to "編集", admin_reservation_path(reservation) %>
             <%= link_to "削除", admin_reservation_path(reservation),
                 method: :delete,
                 data: { confirm: "この予約を削除しますか？" } %>
@@ -3925,205 +4266,77 @@ end
 #### 🔍 **初学者向け詳細説明**
 
 - 映画作品名、座席番号、日時、予約者情報を一覧表示
-- 各予約に編集・削除リンクを設置
-- 予約がない場合のメッセージも表示
+- 編集リンクは show アクション（/admin/reservations/:id）へのリンク
+- 削除リンクには確認ダイアログを設置
 
 ### 5. new アクションの実装
 
 - [ ] 予約追加フォームのためのアクションを実装
-- [ ] 映画、スケジュール、座席の選択ステップを管理
-- [ ] ユーザー側と同じバリデーションを適用
+- [ ] 空の Reservation オブジェクトを作成
 
 ```ruby
 def new
   @reservation = Reservation.new
-
-  # 映画選択のステップ
-  if params[:movie_id].blank?
-    @movies = Movie.where(is_showing: true).order(:name)
-    render :select_movie and return
-  end
-
-  @movie = Movie.find(params[:movie_id])
-
-  # スケジュール選択のステップ
-  if params[:schedule_id].blank?
-    @schedules = @movie.schedules.where('start_time > ?', Time.current).order(:start_time)
-    render :select_schedule and return
-  end
-
-  @schedule = @movie.schedules.find(params[:schedule_id])
-
-  # 日付選択のステップ
-  if params[:date].blank?
-    render :select_date and return
-  end
-
-  @date = Date.parse(params[:date])
-
-  # 座席選択のステップ
-  if params[:sheet_id].blank?
-    @sheets = Sheet.all.order(:row, :column)
-    @reserved_sheet_ids = Reservation.where(
-      schedule_id: @schedule.id,
-      date: @date
-    ).pluck(:sheet_id)
-    render :select_sheet and return
-  end
-
-  @sheet = Sheet.find(params[:sheet_id])
-
-  # 最終的な予約フォーム
-  @reservation.schedule_id = @schedule.id
-  @reservation.sheet_id = @sheet.id
-  @reservation.date = @date
-
-rescue ActiveRecord::RecordNotFound
-  flash[:alert] = '指定された情報が見つかりません。'
-  redirect_to admin_reservations_path
-rescue ArgumentError
-  flash[:alert] = '日付の形式が正しくありません。'
-  redirect_to admin_reservations_path
 end
 ```
 
 #### 🔍 **初学者向け詳細説明**
 
-予約作成は複数のステップで実装：
+シンプルに新規の Reservation オブジェクトを作成するだけです。
 
-1. 映画選択
-2. スケジュール選択
-3. 日付選択
-4. 座席選択
-5. 予約者情報入力
+### 6. 新規予約フォームビューの作成
 
-### 6. 各選択画面のビュー作成
-
-- [ ] `select_movie.html.erb` - 映画選択画面
-- [ ] `select_schedule.html.erb` - スケジュール選択画面
-- [ ] `select_date.html.erb` - 日付選択画面
-- [ ] `select_sheet.html.erb` - 座席選択画面
-- [ ] `new.html.erb` - 最終的な予約フォーム
-
-#### 🔍 **初学者向け詳細説明**
-
-各ステップごとに別のビューファイルを用意し、段階的に予約情報を構築していきます。
-
-### 7. create アクションの実装
-
-- [ ] 予約の作成処理を実装
-- [ ] バリデーションエラー時の処理
-- [ ] 重複予約のチェック
-
-```ruby
-def create
-  @reservation = Reservation.new(reservation_params)
-
-  ActiveRecord::Base.transaction do
-    # 重複チェック
-    if Reservation.exists?(
-      schedule_id: @reservation.schedule_id,
-      sheet_id: @reservation.sheet_id,
-      date: @reservation.date
-    )
-      flash[:alert] = 'その座席はすでに予約済みです。'
-      redirect_to admin_reservations_path and return
-    end
-
-    if @reservation.save
-      flash[:notice] = '予約が作成されました。'
-      redirect_to admin_reservations_path
-    else
-      flash[:alert] = '予約の作成に失敗しました。' + @reservation.errors.full_messages.join(', ')
-      redirect_to admin_reservations_path
-    end
-  end
-
-rescue ActiveRecord::RecordNotUnique
-  flash[:alert] = 'その座席はすでに予約済みです。'
-  redirect_to admin_reservations_path
-rescue => e
-  flash[:alert] = '予約の処理中にエラーが発生しました。'
-  redirect_to admin_reservations_path
-end
-```
-
-#### 🔍 **初学者向け詳細説明**
-
-- トランザクションで処理の一貫性を保証
-- 重複予約を防ぐため、保存前にチェック
-- エラー時は必ず一覧画面に戻る
-
-### 8. edit アクションの実装
-
-- [ ] 既存予約の編集フォームを表示
-- [ ] 現在の予約情報を表示
-- [ ] 変更可能な項目を制限（必要に応じて）
-
-```ruby
-def edit
-  @reservation = Reservation.find(params[:id])
-  @movie = @reservation.schedule.movie
-  @schedule = @reservation.schedule
-  @sheet = @reservation.sheet
-  @date = @reservation.date
-
-  # 編集可能な座席リストを取得（自分以外の予約済み座席を除外）
-  @sheets = Sheet.all.order(:row, :column)
-  @reserved_sheet_ids = Reservation
-    .where(schedule_id: @schedule.id, date: @date)
-    .where.not(id: @reservation.id)  # 自分自身は除外
-    .pluck(:sheet_id)
-
-rescue ActiveRecord::RecordNotFound
-  flash[:alert] = '指定された予約が見つかりません。'
-  redirect_to admin_reservations_path
-end
-```
-
-#### 🔍 **初学者向け詳細説明**
-
-- 編集時は自分自身の座席は予約済みリストから除外
-- 映画やスケジュールの変更は複雑になるため、基本的には座席と予約者情報のみ変更可能に
-
-### 9. 編集ビューの作成
-
-- [ ] `app/views/admin/reservations/edit.html.erb` ファイルを作成
-- [ ] 編集フォームと削除ボタンを実装
+- [ ] `app/views/admin/reservations/new.html.erb` ファイルを作成
+- [ ] schedule_id, sheet_id, date, name, email の入力フォームを作成
 
 ```erb
-<% content_for :title, "予約編集" %>
+<% content_for :title, "新規予約追加" %>
 
-<h1>予約編集</h1>
-
-<div class="reservation-info">
-  <h3>予約情報</h3>
-  <p>
-    <strong>映画:</strong> <%= @movie.name %><br>
-    <strong>日時:</strong> <%= @date.strftime("%Y年%m月%d日") %> <%= @schedule.start_time.strftime("%H:%M") %><br>
-    <strong>現在の座席:</strong> <%= @sheet.row %>-<%= @sheet.column %>
-  </p>
-</div>
+<h1>新規予約追加</h1>
 
 <%= form_with model: [:admin, @reservation], local: true do |f| %>
-  <%= f.hidden_field :schedule_id %>
-  <%= f.hidden_field :date %>
+  <% if @reservation.errors.any? %>
+    <div class="alert alert-danger">
+      <ul>
+        <% @reservation.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="form-group">
+    <%= f.label :schedule_id, "スケジュール" %>
+    <%= f.collection_select :schedule_id,
+        Schedule.includes(:movie).order('movies.name, schedules.start_time'),
+        :id,
+        ->(s) { "#{s.movie.name} - #{s.start_time.strftime('%H:%M')} - #{s.end_time.strftime('%H:%M')}" },
+        { prompt: "選択してください" },
+        { class: "form-control", required: true } %>
+  </div>
 
   <div class="form-group">
     <%= f.label :sheet_id, "座席" %>
-    <%= f.select :sheet_id,
-        options_for_select(
-          @sheets.reject { |s| @reserved_sheet_ids.include?(s.id) }
-                 .map { |s| ["#{s.row}-#{s.column}", s.id] },
-          @reservation.sheet_id
-        ),
-        {},
-        class: "form-control" %>
+    <%= f.collection_select :sheet_id,
+        Sheet.all.order(:row, :column),
+        :id,
+        ->(s) { "#{s.row}-#{s.column}" },
+        { prompt: "選択してください" },
+        { class: "form-control", required: true } %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :date, "予約日" %>
+    <%= f.date_field :date,
+        class: "form-control",
+        required: true,
+        min: Date.today,
+        max: Date.today + 7.days %>
   </div>
 
   <div class="form-group">
     <%= f.label :name, "名前" %>
-    <%= f.text_field :name, class: "form-control", required: true %>
+    <%= f.text_field :name, class: "form-control", required: true, maxlength: 50 %>
   </div>
 
   <div class="form-group">
@@ -4131,25 +4344,136 @@ end
     <%= f.email_field :email, class: "form-control", required: true %>
   </div>
 
-  <%= f.submit "更新", class: "btn btn-primary" %>
+  <div class="form-actions">
+    <%= f.submit "予約を作成", class: "btn btn-primary" %>
+    <%= link_to "キャンセル", admin_reservations_path, class: "btn btn-secondary" %>
+  </div>
 <% end %>
-
-<div style="margin-top: 20px;">
-  <%= link_to "削除",
-      admin_reservation_path(@reservation),
-      method: :delete,
-      data: { confirm: "この予約を削除しますか？" },
-      class: "btn btn-danger" %>
-</div>
-
-<p><%= link_to "一覧に戻る", admin_reservations_path %></p>
 ```
 
 #### 🔍 **初学者向け詳細説明**
 
-- 映画・日時は変更不可として表示のみ
-- 座席は空いている座席のみ選択可能
-- 削除ボタンも同じ画面に配置
+- `collection_select`: プルダウンメニューで選択肢を表示
+- すべてのスケジュールと座席を選択可能にする（重複チェックはコントローラーで行う）
+- 日付は今日から 7 日後までに制限
+
+### 7. create アクションの実装
+
+- [ ] 予約の作成処理を実装
+- [ ] 成功時は 302 ステータスでリダイレクト
+- [ ] エラー時は 400 ステータスを返す
+
+```ruby
+def create
+  @reservation = Reservation.new(reservation_params)
+
+  if @reservation.save
+    redirect_to admin_reservations_path, notice: '予約が作成されました。'
+  else
+    render :new, status: :bad_request
+  end
+
+rescue ActiveRecord::RecordNotUnique
+  @reservation.errors.add(:base, 'その座席はすでに予約済みです。')
+  render :new, status: :bad_request
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- 保存成功時：302 ステータスで一覧画面にリダイレクト
+- 保存失敗時：400 ステータスで new ビューを再表示
+- 重複エラー時：同じく 400 ステータスを返す
+
+### 8. show アクションの実装
+
+- [ ] 予約詳細・編集フォームを表示
+- [ ] 編集フォームにデータを事前入力
+
+```ruby
+def show
+  @reservation = Reservation.find(params[:id])
+rescue ActiveRecord::RecordNotFound
+  redirect_to admin_reservations_path, alert: '指定された予約が見つかりません。'
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+show アクションで編集フォームも兼ねるため、既存のデータを取得して表示します。
+
+### 9. show ビューの作成
+
+- [ ] `app/views/admin/reservations/show.html.erb` ファイルを作成
+- [ ] 編集フォームと削除ボタンを実装
+
+```erb
+<% content_for :title, "予約詳細・編集" %>
+
+<h1>予約詳細・編集</h1>
+
+<%= form_with model: [:admin, @reservation], local: true do |f| %>
+  <% if @reservation.errors.any? %>
+    <div class="alert alert-danger">
+      <ul>
+        <% @reservation.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="form-group">
+    <%= f.label :schedule_id, "スケジュール" %>
+    <%= f.collection_select :schedule_id,
+        Schedule.includes(:movie).order('movies.name, schedules.start_time'),
+        :id,
+        ->(s) { "#{s.movie.name} - #{s.start_time.strftime('%H:%M')} - #{s.end_time.strftime('%H:%M')}" },
+        {},
+        { class: "form-control", required: true } %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :sheet_id, "座席" %>
+    <%= f.collection_select :sheet_id,
+        Sheet.all.order(:row, :column),
+        :id,
+        ->(s) { "#{s.row}-#{s.column}" },
+        {},
+        { class: "form-control", required: true } %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :date, "予約日" %>
+    <%= f.date_field :date, class: "form-control", required: true %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :name, "名前" %>
+    <%= f.text_field :name, class: "form-control", required: true, maxlength: 50 %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :email, "メールアドレス" %>
+    <%= f.email_field :email, class: "form-control", required: true %>
+  </div>
+
+  <div class="form-actions">
+    <%= f.submit "更新", class: "btn btn-primary" %>
+    <%= link_to "削除", admin_reservation_path(@reservation),
+        method: :delete,
+        data: { confirm: "この予約を削除しますか？" },
+        class: "btn btn-danger" %>
+    <%= link_to "一覧に戻る", admin_reservations_path, class: "btn btn-secondary" %>
+  </div>
+<% end %>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+- 既存のデータがフォームに事前入力されている
+- 更新ボタンと削除ボタンを同じ画面に配置
+- すべての項目を編集可能にする
 
 ### 10. update アクションの実装
 
@@ -4210,18 +4534,16 @@ end
 ### 11. destroy アクションの実装
 
 - [ ] 予約の削除処理を実装
-- [ ] 削除後は一覧画面にリダイレクト
+- [ ] 物理削除を実行
 
 ```ruby
 def destroy
   @reservation = Reservation.find(params[:id])
   @reservation.destroy
-  flash[:notice] = '予約が削除されました。'
-  redirect_to admin_reservations_path
+  redirect_to admin_reservations_path, notice: '予約が削除されました。'
 
 rescue ActiveRecord::RecordNotFound
-  flash[:alert] = '指定された予約が見つかりません。'
-  redirect_to admin_reservations_path
+  redirect_to admin_reservations_path, alert: '指定された予約が見つかりません。'
 rescue => e
   flash[:alert] = '予約の削除中にエラーが発生しました。'
   redirect_to admin_reservations_path
@@ -4230,8 +4552,8 @@ end
 
 #### 🔍 **初学者向け詳細説明**
 
-- 物理削除を実行
-- エラーが発生しても必ず一覧画面に戻る
+- 物理削除を実行（データベースから完全に削除）
+- 削除後は一覧画面にリダイレクト
 
 ### 12. Strong Parameters の定義
 
@@ -4256,6 +4578,56 @@ Strong Parameters で、フォームから送信されるパラメータのう�
 - [ ] フォームのレイアウト調整
 - [ ] エラーメッセージの見た目を改善
 
+```css
+/* application.css に追加 */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.alert {
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.alert-danger {
+  color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+.btn {
+  padding: 10px 20px;
+  margin-right: 10px;
+  text-decoration: none;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+```
+
 #### 🔍 **初学者向け詳細説明**
 
 管理画面として統一感のあるデザインを心がけ、使いやすい UI を実装します。
@@ -4265,10 +4637,11 @@ Strong Parameters で、フォームから送信されるパラメータのう�
 - [ ] サーバーを起動（`bundle exec rails server`）
 - [ ] `/admin/reservations` で予約一覧が表示されることを確認
 - [ ] 新規予約追加が正常に動作することを確認
-  - [ ] 各ステップ（映画選択 → スケジュール選択 → 日付選択 → 座席選択 → 予約者情報入力）が動作
-  - [ ] 重複予約でエラーが表示される
-- [ ] 予約編集が正常に動作することを確認
-  - [ ] 座席変更ができる
+  - [ ] 全項目を入力して作成できる
+  - [ ] 重複予約で 400 エラーが返される
+- [ ] 予約詳細・編集が正常に動作することを確認
+  - [ ] 既存データがフォームに表示される
+  - [ ] 更新ができる
   - [ ] 予約済み座席への変更でエラーが表示される
 - [ ] 予約削除が正常に動作することを確認
 - [ ] 過去の予約が一覧に表示されないことを確認
@@ -4278,7 +4651,7 @@ Strong Parameters で、フォームから送信されるパラメータのう�
 動作確認では以下の点を重点的にチェック：
 
 - 正常系：各機能が期待通りに動作するか
-- 異常系：エラーが適切に表示されるか
+- 異常系：エラーが適切に表示されるか（400 ステータス）
 - データの整合性：重複予約が防げているか
 
 ### 15. テスト実行
@@ -4293,52 +4666,112 @@ Strong Parameters で、フォームから送信されるパラメータのう�
 - `app/controllers/admin/reservations_controller.rb`（新規作成）
 - `app/views/admin/reservations/index.html.erb`（新規作成）
 - `app/views/admin/reservations/new.html.erb`（新規作成）
-- `app/views/admin/reservations/select_movie.html.erb`（新規作成）
-- `app/views/admin/reservations/select_schedule.html.erb`（新規作成）
-- `app/views/admin/reservations/select_date.html.erb`（新規作成）
-- `app/views/admin/reservations/select_sheet.html.erb`（新規作成）
-- `app/views/admin/reservations/edit.html.erb`（新規作成）
+- `app/views/admin/reservations/show.html.erb`（新規作成）
 - `config/routes.rb`（編集）
 
-### 簡易版の実装（時間がない場合）
+### コントローラーの完全な実装例
 
-もし段階的な選択画面の実装が複雑な場合は、新規予約をユーザー側の `/movies/:id` からスタートさせる簡易実装も可能です：
+```ruby
+class Admin::ReservationsController < ApplicationController
+  before_action :set_reservation, only: [:show, :update, :destroy]
 
-```erb
-<!-- app/views/admin/reservations/new.html.erb（簡易版） -->
-<h1>新規予約追加</h1>
-<p>映画詳細ページから予約を開始してください。</p>
-<%= link_to "映画一覧へ", movies_path, class: "btn btn-primary" %>
+  def index
+    @reservations = Reservation
+      .joins(schedule: :movie, sheet: {})
+      .where('reservations.date > ? OR (reservations.date = ? AND schedules.start_time > ?)',
+             Date.today, Date.today, Time.current.strftime('%H:%M:%S'))
+      .includes(schedule: :movie, sheet: {})
+      .order('reservations.date ASC, schedules.start_time ASC')
+  end
+
+  def new
+    @reservation = Reservation.new
+  end
+
+  def create
+    @reservation = Reservation.new(reservation_params)
+
+    if @reservation.save
+      redirect_to admin_reservations_path, notice: '予約が作成されました。'
+    else
+      render :new, status: :bad_request
+    end
+
+  rescue ActiveRecord::RecordNotUnique
+    @reservation.errors.add(:base, 'その座席はすでに予約済みです。')
+    render :new, status: :bad_request
+  end
+
+  def show
+  end
+
+  def update
+    if params[:reservation][:schedule_id].present? &&
+       params[:reservation][:sheet_id].present? &&
+       params[:reservation][:name].present? &&
+       params[:reservation][:email].present?
+
+      if @reservation.update(reservation_params)
+        redirect_to admin_reservations_path, notice: '予約が更新されました。'
+      else
+        render :show, status: :bad_request
+      end
+    else
+      @reservation.errors.add(:base, '必須項目をすべて入力してください。')
+      render :show, status: :bad_request
+    end
+
+  rescue ActiveRecord::RecordNotUnique
+    @reservation.errors.add(:base, 'その座席はすでに予約済みです。')
+    render :show, status: :bad_request
+  end
+
+  def destroy
+    @reservation.destroy
+    redirect_to admin_reservations_path, notice: '予約が削除されました。'
+  end
+
+  private
+
+  def set_reservation
+    @reservation = Reservation.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    redirect_to admin_reservations_path, alert: '指定された予約が見つかりません。'
+  end
+
+  def reservation_params
+    params.require(:reservation).permit(:schedule_id, :sheet_id, :date, :name, :email)
+  end
+end
 ```
 
 ### テスト項目（station12）
 
 - GET /admin/reservations が 200 ステータスで返される
-- 上映予定の予約のみが表示される
-- 過去の予約が表示されない
-- 各予約の映画作品・座席・日時・名前・メールアドレスが表示される
-- GET /admin/reservations/new で予約追加フォームが表示される
-- POST /admin/reservations で予約が作成できる
-- 重複予約でエラーが表示される
+- 予約を全件出力している
+- GET /admin/reservations/new が 200 ステータスで返される
+- name, email, schedule_id, sheet_id のすべてを受け取るフォームがある
+- POST /admin/reservations/ で必須項目がすべてある場合 302 を返す
+- DB の unique 制約にあたったときなどは 400 を返す
 - GET /admin/reservations/:id で編集フォームが表示される
-- PUT /admin/reservations/:id で予約が更新できる
-- DELETE /admin/reservations/:id で予約が削除できる
-- エラー時に Rails デフォルトのエラー画面が表示されない
+- DB 上のデータがすでにフォームに入っている
+- PUT /admin/reservations/:id で必須項目がすべてある場合のみ 302 を返す
+- DELETE /admin/reservations/:id で物理削除される
 
 ### 🎯 **初学者向け重要ポイント**
 
-1. **管理画面の設計**: ユーザー側とは異なる権限と機能を持つ
-2. **複数ステップのフォーム**: 段階的に情報を収集する実装方法
-3. **重複チェック**: 編集時は自分自身を除外する必要がある
-4. **エラーハンドリング**: 管理者にも分かりやすいエラーメッセージ
-5. **データの整合性**: 予約の一貫性を保つ重要性
+1. **単一フォーム設計**: 段階的な選択ではなく、1 つの画面で全情報を入力
+2. **ステータスコード**: 成功時は 302（リダイレクト）、エラー時は 400（Bad Request）
+3. **show アクションの利用**: Rails の慣習では edit アクションが一般的だが、この課題では show を使用
+4. **エラーハンドリング**: 重複予約や必須項目チェックを適切に処理
+5. **データの整合性**: unique 制約を活用した重複防止
 
 ### 🚨 **注意事項**
 
-- 過去の予約は表示しない（index アクションでの絞り込み）
-- エラー時は必ず一覧画面に戻る（new アクションの仕様）
-- Rails デフォルトのエラー画面を出さない
-- 編集時の重複チェックでは自分自身を除外する
+- エラー時は 400 ステータスを返す（一覧画面へのリダイレクトではない）
+- show アクションで編集フォームを表示する（edit アクションは使わない）
+- 必須パラメータがすべて揃っている場合のみ更新を実行
+- 過去の予約は一覧に表示しない
 
 ### 🔧 **発展課題（余裕があれば）**
 
@@ -4350,4 +4783,543 @@ Strong Parameters で、フォームから送信されるパラメータのう�
 
 ---
 
-</rewritten_file>
+# lesson-13
+
+## 課題概要
+
+映画館のスクリーンを 3 つに増設し、それぞれ独立して管理できる機能を実装する。各スクリーンで別々の映画を上映でき、同じ時間帯でもスクリーンが異なれば同じ座席番号を予約できるようにする。
+
+### 要件
+
+- スクリーン 1, 2, 3 でそれぞれ別の作品を上映している
+- スクリーン 1-3 のどこで上映されるかは、映画館に行くまでユーザーが知る必要はない（画面に出さない）
+- 同じ時間帯であってもスクリーンが別であれば同じ座席番号も予約できる
+  - スクリーン 1 の A-1 とスクリーン 2 の A-1 は別物なので予約できる
+- 同じ映画館の別スクリーンの同じ座席で予約済みと誤判定しないように実装
+
+### 技術仕様
+
+- screens テーブルを新規作成
+- schedules テーブルに screen_id を追加
+- sheets テーブルに screen_id を追加
+- 予約の重複チェックに screen_id を含める
+
+## 実装手順
+
+### 1. Screen モデルの作成
+
+- [ ] `app/models/screen.rb` ファイルを作成
+- [ ] ApplicationRecord を継承した Screen クラスを定義
+- [ ] 必要な属性：id, name
+- [ ] アソシエーションの設定
+  - [ ] has_many :schedules
+  - [ ] has_many :sheets
+
+```ruby
+class Screen < ApplicationRecord
+  has_many :schedules, dependent: :destroy
+  has_many :sheets, dependent: :destroy
+
+  validates :name, presence: true, uniqueness: true
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+Screen モデルは映画館のスクリーン（上映室）を管理します。各スクリーンは独立した上映スケジュールと座席を持ちます。
+
+### 2. screens テーブルのマイグレーション作成
+
+- [ ] `bundle exec rails generate migration CreateScreens` でマイグレーション生成
+- [ ] テーブル定義を実装
+  - [ ] `t.string :name, null: false` (スクリーン名)
+  - [ ] ユニークインデックスを追加
+
+```ruby
+class CreateScreens < ActiveRecord::Migration[7.0]
+  def change
+    create_table :screens do |t|
+      t.string :name, null: false
+
+      t.timestamps
+    end
+
+    add_index :screens, :name, unique: true
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+screens テーブルでスクリーン 1、スクリーン 2、スクリーン 3 を管理します。
+
+### 3. schedules テーブルへの screen_id 追加
+
+- [ ] `bundle exec rails generate migration AddScreenIdToSchedules` でマイグレーション生成
+- [ ] screen_id カラムを追加
+- [ ] 外部キー制約を設定
+
+```ruby
+class AddScreenIdToSchedules < ActiveRecord::Migration[7.0]
+  def change
+    add_reference :schedules, :screen, null: false, foreign_key: true
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+各上映スケジュールがどのスクリーンで上映されるかを管理するために、schedules テーブルに screen_id を追加します。
+
+### 4. sheets テーブルへの screen_id 追加
+
+- [ ] `bundle exec rails generate migration AddScreenIdToSheets` でマイグレーション生成
+- [ ] screen_id カラムを追加
+- [ ] 既存の座席データの扱いを考慮
+
+```ruby
+class AddScreenIdToSheets < ActiveRecord::Migration[7.0]
+  def change
+    # 一時的にnullを許可してカラムを追加
+    add_reference :sheets, :screen, null: true, foreign_key: true
+
+    # 既存データがある場合はスクリーン1に割り当て
+    reversible do |dir|
+      dir.up do
+        # デフォルトのスクリーンを作成
+        screen1 = Screen.find_or_create_by(name: 'スクリーン1')
+
+        # 既存の座席をスクリーン1に割り当て
+        Sheet.update_all(screen_id: screen1.id)
+
+        # null制約を追加
+        change_column_null :sheets, :screen_id, false
+      end
+    end
+
+    # 複合ユニークインデックスを追加（同じスクリーン内での座席の重複を防ぐ）
+    add_index :sheets, [:screen_id, :row, :column], unique: true
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+各座席がどのスクリーンに属するかを管理します。既存データがある場合は、すべてスクリーン 1 に割り当てます。
+
+### 5. モデルのアソシエーション更新
+
+- [ ] Schedule モデルを編集
+  - [ ] belongs_to :screen を追加
+- [ ] Sheet モデルを編集
+  - [ ] belongs_to :screen を追加
+  - [ ] seat_number メソッドの更新（必要に応じて）
+
+```ruby
+# app/models/schedule.rb
+class Schedule < ApplicationRecord
+  belongs_to :movie
+  belongs_to :screen
+  has_many :reservations, dependent: :destroy
+
+  # 既存のバリデーション...
+end
+
+# app/models/sheet.rb
+class Sheet < ApplicationRecord
+  belongs_to :screen
+  has_many :reservations, dependent: :destroy
+
+  validates :column, presence: true, inclusion: { in: 1..5 }
+  validates :row, presence: true, inclusion: { in: %w[a b c] }
+  validates :row, uniqueness: { scope: [:column, :screen_id] }
+
+  def seat_number
+    "#{row}-#{column}"
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+アソシエーションを設定することで、Rails が自動的にテーブル間の関係を管理してくれます。
+
+### 6. シードデータの更新
+
+- [ ] `db/seeds.rb` を編集
+- [ ] 3 つのスクリーンを作成
+- [ ] 各スクリーンに座席を作成
+- [ ] 各スクリーンに異なる映画のスケジュールを作成
+
+```ruby
+# db/seeds.rb
+
+# スクリーンの作成
+puts "スクリーンを作成中..."
+screens = []
+3.times do |i|
+  screens << Screen.find_or_create_by(name: "スクリーン#{i + 1}")
+end
+
+# 各スクリーンに座席を作成
+puts "座席を作成中..."
+screens.each do |screen|
+  seats_data = [
+    { column: 1, row: 'a' }, { column: 2, row: 'a' }, { column: 3, row: 'a' }, { column: 4, row: 'a' }, { column: 5, row: 'a' },
+    { column: 1, row: 'b' }, { column: 2, row: 'b' }, { column: 3, row: 'b' }, { column: 4, row: 'b' }, { column: 5, row: 'b' },
+    { column: 1, row: 'c' }, { column: 2, row: 'c' }, { column: 3, row: 'c' }, { column: 4, row: 'c' }, { column: 5, row: 'c' }
+  ]
+
+  seats_data.each do |seat_data|
+    screen.sheets.find_or_create_by(seat_data)
+  end
+end
+
+# 各スクリーンに異なる映画のスケジュールを作成
+puts "スケジュールを更新中..."
+if Movie.exists?
+  movies = Movie.where(is_showing: true).limit(3)
+
+  movies.each_with_index do |movie, index|
+    screen = screens[index]
+
+    # 既存のスケジュールを削除
+    movie.schedules.destroy_all
+
+    # 新しいスケジュールを作成（スクリーンを指定）
+    [
+      { start_time: '10:00', end_time: '12:00' },
+      { start_time: '14:00', end_time: '16:00' },
+      { start_time: '18:00', end_time: '20:00' }
+    ].each do |schedule_data|
+      movie.schedules.create!(
+        start_time: schedule_data[:start_time],
+        end_time: schedule_data[:end_time],
+        screen: screen
+      )
+    end
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+各スクリーンに同じ構成の座席（3 行 ×5 列）を作成し、異なる映画を上映するスケジュールを設定します。
+
+### 7. 予約の重複チェックロジック更新
+
+- [ ] Reservation モデルのバリデーションを更新
+- [ ] スクリーンを考慮した重複チェック
+
+```ruby
+# app/models/reservation.rb
+class Reservation < ApplicationRecord
+  belongs_to :schedule
+  belongs_to :sheet
+
+  # バリデーション
+  validates :date, presence: true
+  validates :email, presence: true, format: { with: /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i }
+  validates :name, presence: true, length: { maximum: 50 }
+
+  # スクリーンを考慮した座席の重複チェック
+  validate :seat_must_be_unique_per_screen
+
+  # 既存のカスタムバリデーション...
+
+  private
+
+  def seat_must_be_unique_per_screen
+    return unless schedule && sheet && date
+
+    # 同じスクリーンの座席かチェック
+    if sheet.screen_id != schedule.screen_id
+      errors.add(:sheet, 'は選択されたスケジュールのスクリーンと一致しません')
+      return
+    end
+
+    # 同じ日付・スケジュール・座席の予約が存在するかチェック
+    existing_reservation = Reservation
+      .joins(:schedule)
+      .where(
+        date: date,
+        schedule_id: schedule_id,
+        sheet_id: sheet_id
+      )
+      .where.not(id: id) # 自分自身を除外（更新時）
+      .exists?
+
+    if existing_reservation
+      errors.add(:sheet, 'はその日時ですでに予約されています')
+    end
+  end
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+スクリーンが異なれば同じ座席番号でも予約できるように、重複チェックのロジックを更新します。
+
+### 8. コントローラーの更新
+
+- [ ] MoviesController#reservation アクションの更新
+  - [ ] 選択されたスケジュールのスクリーンの座席のみ表示
+- [ ] ReservationsController#new アクションの更新
+  - [ ] スクリーンの整合性チェック
+
+```ruby
+# app/controllers/movies_controller.rb
+def reservation
+  @movie = Movie.find(params[:id])
+
+  # パラメータ検証（既存のコード）
+  if params[:schedule_id].blank?
+    flash[:alert] = 'スケジュールを選択してください。'
+    redirect_to movie_path(@movie) and return
+  end
+
+  if params[:date].blank?
+    flash[:alert] = '日付を選択してください。'
+    redirect_to movie_path(@movie) and return
+  end
+
+  @schedule = @movie.schedules.find(params[:schedule_id])
+  @date = Date.parse(params[:date])
+
+  # 選択されたスケジュールのスクリーンの座席のみ取得
+  @sheets = @schedule.screen.sheets.order(:row, :column)
+  @seats = @sheets  # 互換性のため
+
+  # 予約済みの座席IDを取得（同じスクリーン内のみ）
+  @reserved_sheet_ids = Reservation
+    .joins(:schedule)
+    .where(
+      schedule_id: @schedule.id,
+      date: @date,
+      sheet_id: @sheets.pluck(:id) # 同じスクリーンの座席のみ
+    )
+    .pluck(:sheet_id)
+
+rescue ActiveRecord::RecordNotFound
+  flash[:alert] = '指定されたスケジュールが見つかりません。'
+  redirect_to movie_path(@movie)
+rescue ArgumentError
+  flash[:alert] = '日付の形式が正しくありません。'
+  redirect_to movie_path(@movie)
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+選択されたスケジュールのスクリーンに属する座席のみを表示し、予約状況もそのスクリーン内でのみチェックします。
+
+### 9. 管理画面の更新
+
+- [ ] Admin::SchedulesController の更新
+  - [ ] スクリーン選択フィールドの追加
+- [ ] Admin::ReservationsController の更新
+  - [ ] スクリーンを考慮した座席選択
+
+```ruby
+# app/controllers/admin/schedules_controller.rb
+private
+
+def schedule_params
+  params.require(:schedule).permit(:start_time, :end_time, :screen_id)
+end
+```
+
+```erb
+<!-- app/views/admin/schedules/new.html.erb に追加 -->
+<div class="field">
+  <%= f.label :screen_id, "スクリーン" %>
+  <%= f.collection_select :screen_id,
+      Screen.all.order(:name),
+      :id,
+      :name,
+      { prompt: "選択してください" },
+      { class: "form-control", required: true } %>
+</div>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+管理画面でスケジュールを作成する際に、どのスクリーンで上映するかを選択できるようにします。
+
+### 10. ビューの調整
+
+- [ ] ユーザー側の画面ではスクリーン情報を表示しない
+- [ ] 管理画面ではスクリーン情報を表示
+- [ ] 座席表表示時のスクリーン考慮
+
+```erb
+<!-- app/views/admin/schedules/index.html.erb を更新 -->
+<h2>作品ID: <%= movie.id %> - <%= movie.name %></h2>
+
+<table class="schedule-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>スクリーン</th>
+      <th>開始時刻</th>
+      <th>終了時刻</th>
+      <th>作成日時</th>
+      <th>更新日時</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% movie.schedules.includes(:screen).order(:start_time).each do |schedule| %>
+      <tr>
+        <td><%= link_to schedule.id, edit_admin_schedule_path(schedule) %></td>
+        <td><%= schedule.screen.name %></td>
+        <td><%= schedule.start_time.strftime("%H:%M") %></td>
+        <td><%= schedule.end_time.strftime("%H:%M") %></td>
+        <td><%= schedule.created_at.strftime("%Y-%m-%d %H:%M") %></td>
+        <td><%= schedule.updated_at.strftime("%Y-%m-%d %H:%M") %></td>
+        <td><%= link_to "編集", edit_admin_schedule_path(schedule) %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+管理画面ではスクリーン情報を表示しますが、ユーザー側では表示しません（要件通り）。
+
+### 11. マイグレーションの実行
+
+- [ ] `bundle exec rails db:migrate` でマイグレーション実行
+- [ ] `bundle exec rails db:seed` でシードデータ投入
+- [ ] データが正しく投入されたことを確認
+
+```bash
+# コンソールで確認
+bundle exec rails console
+
+# スクリーンが3つ作成されているか
+Screen.count  # => 3
+
+# 各スクリーンに15席ずつあるか
+Screen.all.each { |s| puts "#{s.name}: #{s.sheets.count}席" }
+
+# スケジュールにスクリーンが設定されているか
+Schedule.includes(:screen, :movie).each do |s|
+  puts "#{s.movie.name} - #{s.screen.name} - #{s.start_time.strftime('%H:%M')}"
+end
+```
+
+#### 🔍 **初学者向け詳細説明**
+
+マイグレーション実行後、データが正しく設定されているかコンソールで確認します。
+
+### 12. 動作確認
+
+- [ ] サーバーを起動（`bundle exec rails server`）
+- [ ] 映画予約の動作確認
+  - [ ] 異なる映画が異なるスクリーンで上映されていることを確認
+  - [ ] 同じ座席番号でも異なるスクリーンなら予約できることを確認
+- [ ] 管理画面の動作確認
+  - [ ] スケジュール作成時にスクリーンを選択できることを確認
+  - [ ] スクリーン情報が一覧に表示されることを確認
+
+#### 🔍 **初学者向け詳細説明**
+
+例えば：
+
+- スクリーン 1 で A-1 を予約済み
+- スクリーン 2 でも A-1 を予約できる（別のスクリーンなので OK）
+- スクリーン 1 で再度 A-1 を予約しようとするとエラー（同じスクリーンで重複）
+
+### 13. エラーケースの確認
+
+- [ ] 異なるスクリーンのスケジュールと座席を組み合わせて予約しようとした場合
+- [ ] 同じスクリーンで同じ座席を重複予約しようとした場合
+- [ ] データ不整合が起きないことを確認
+
+#### 🔍 **初学者向け詳細説明**
+
+スクリーンの整合性チェックが正しく機能し、不正な組み合わせでは予約できないことを確認します。
+
+### 14. テスト実行
+
+- [ ] `bundle exec rspec spec/station13/` でテストを実行
+- [ ] すべてのテストが通ることを確認
+
+## 参考情報
+
+### 必要なファイル
+
+- `app/models/screen.rb`（新規作成）
+- `app/models/schedule.rb`（編集）
+- `app/models/sheet.rb`（編集）
+- `app/models/reservation.rb`（編集）
+- `app/controllers/movies_controller.rb`（編集）
+- `app/controllers/admin/schedules_controller.rb`（編集）
+- `db/migrate/YYYYMMDD_create_screens.rb`（新規作成）
+- `db/migrate/YYYYMMDD_add_screen_id_to_schedules.rb`（新規作成）
+- `db/migrate/YYYYMMDD_add_screen_id_to_sheets.rb`（新規作成）
+- `db/seeds.rb`（編集）
+
+### データベース構造
+
+```
+screens
+  - id
+  - name (スクリーン1, スクリーン2, スクリーン3)
+
+schedules
+  - id
+  - movie_id
+  - screen_id (追加)
+  - start_time
+  - end_time
+
+sheets
+  - id
+  - screen_id (追加)
+  - row
+  - column
+
+reservations
+  - id
+  - schedule_id (→ screen_idが間接的に決まる)
+  - sheet_id (→ screen_idが間接的に決まる)
+  - date
+  - name
+  - email
+```
+
+### テスト項目（station13）
+
+- Screen モデルが作成されている
+- date, sheet_id のどちらかまたは両方が渡されていないとき 200 を返さない（既存機能の確認）
+- 異なるスクリーンで同じ座席番号を予約できる
+- 同じスクリーンで同じ座席を重複予約できない
+- スクリーンの整合性が保たれる（異なるスクリーンのスケジュールと座席を組み合わせられない）
+
+### 🎯 **初学者向け重要ポイント**
+
+1. **マルチテナント設計**: 1 つのシステムで複数の独立した空間（スクリーン）を管理
+2. **データの整合性**: スケジュールと座席のスクリーンが一致することを保証
+3. **既存データの移行**: 新しいカラムを追加する際の既存データの扱い
+4. **ユーザー体験**: スクリーン情報を隠すことで、ユーザーを混乱させない
+5. **重複チェックの範囲**: 同じスクリーン内でのみ重複をチェック
+
+### 🚨 **注意事項**
+
+- ユーザー側の画面ではスクリーン情報を表示しない（要件）
+- 既存のデータがある場合は適切に移行する
+- スクリーンをまたいだ不正な予約を防ぐ
+- パフォーマンスを考慮したクエリ設計
+
+### 🔧 **発展課題（余裕があれば）**
+
+- スクリーンごとに座席数を変更できる機能
+- スクリーンごとに料金を設定する機能
+- スクリーンの稼働率分析機能
+- 特定のスクリーンでのみ上映可能な映画の設定
+- スクリーンのメンテナンススケジュール管理
+
+---

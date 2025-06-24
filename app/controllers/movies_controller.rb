@@ -16,15 +16,23 @@ class MoviesController < ApplicationController
     def reservation
         @movie = Movie.find(params[:id])
         @sheets = Sheet.all
-        # クエリパラメータの検証
-        if params[:schedule_id].blank? || params[:date].blank?
+        
+        # クエリパラメータの検証（schedule_idは必須）
+        if params[:schedule_id].blank?
             flash[:alert] = "上映日時を選択してください"
             redirect_to movie_path(@movie) and return
         end
 
         @schedule = @movie.schedules.find(params[:schedule_id])
-        # スケジュールから日付を自動取得
-        @date = @schedule.start_time.to_date
+        
+        # dateパラメータがある場合はそれを使用、ない場合はschedule_idから日付を取得
+        if params[:date].present?
+            @date = Date.parse(params[:date])
+        else
+            # スケジュールのstart_timeから日付を自動取得
+            @date = @schedule.start_time.to_date
+        end
+        
         @seats = Sheet.all.order(:row, :column)
 
         # すでに予約済みの座席を取得
@@ -35,6 +43,9 @@ class MoviesController < ApplicationController
 
     rescue ActiveRecord::RecordNotFound
         flash[:alert] = "指定されたスケジュールが見つかりません"
+        redirect_to movie_path(@movie)
+    rescue ArgumentError
+        flash[:alert] = "日付の形式が正しくありません"
         redirect_to movie_path(@movie)
     end
 

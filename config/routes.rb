@@ -14,9 +14,12 @@ Rails.application.routes.draw do
   
   namespace :admin do
     resources :movies, only: [:index, :new, :create, :edit, :update, :destroy] do
-      resources :schedules, only: [:new, :create]
+      member do
+        get 'schedules/new', to: 'schedules#new'
+      end
     end
-    resources :schedules, only: [:index, :edit, :update, :destroy]
+    resources :schedules, only: [:index, :create, :edit, :update, :destroy]
+    resources :reservations
   end
 
   
